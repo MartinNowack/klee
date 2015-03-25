@@ -563,7 +563,7 @@ void StatsTracker::writeIStats() {
 
 
       // start a new function
-      of << "fn=" << KModule::getDemangledName(fnIt) << "\n";
+      of << "fn=" << fnIt->getName() << "\n";
       for (Function::iterator bbIt = fnIt->begin(), bb_ie = fnIt->end(); 
            bbIt != bb_ie; ++bbIt) {
         for (BasicBlock::iterator it = bbIt->begin(), ie = bbIt->end(); 
@@ -597,7 +597,7 @@ void StatsTracker::writeIStats() {
   
                 if (fii.file!="" && fii.file!=InsideFunctionSourceFile)
                   of << "cfi=" << fii.file << "\n";
-                of << "cfn=" << KModule::getDemangledName(f) << "\n";
+                of << "cfn=" << f->getName() << "\n";
                 of << "calls=" << csi.count << " ";
                 of << fii.assemblyLine << " ";
                 of << fii.line << "\n";
