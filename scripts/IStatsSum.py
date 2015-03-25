@@ -60,8 +60,8 @@ def getSummary(input):
         for elt in inputs:
             while 1:
                 ln = getLine(elt)
-                if ln is not None and (ln.startswith('cfl=') or ln.startswith('cfn=')):
-                    if ln.startswith('cfl='):
+                if ln is not None and (ln.startswith('cfi=') or ln.startswith('cfn=')):
+                    if ln.startswith('cfi='):
                         cfl = ln
                         cfn = getLine(elt)
                         if not cfn.startswith('cfn='):
@@ -94,7 +94,7 @@ def getSummary(input):
         ln = lns[0]
         if ln is None:
             break
-        elif ln.startswith('fn') or ln.startswith('fl'):
+        elif ln.startswith('fn') or ln.startswith('fl') or ln.startswith('fi'):
             pass
         elif ln.strip():
             # an actual statistic
