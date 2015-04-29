@@ -95,6 +95,7 @@ addons:
     - libcap-dev
     - libselinux1-dev
     - cmake
+    - libedit-dev
 
 cache: apt
 before_install:
