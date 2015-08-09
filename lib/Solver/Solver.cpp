@@ -195,13 +195,12 @@ Solver::getInitialValues(const Query& query,
                          const std::vector<const Array*> &objects,
                          std::vector< std::vector<unsigned char> > &values) {
   bool hasSolution;
-  bool success =
-    impl->computeInitialValues(query, objects, values, hasSolution);
+
+  if (!impl->computeInitialValues(query, objects, values, hasSolution))
+      return false;
+
   // FIXME: Propogate this out.
-  if (!hasSolution)
-    return false;
-    
-  return success;
+  return hasSolution;
 }
 
 std::pair< ref<Expr>, ref<Expr> > Solver::getRange(const Query& query) {
