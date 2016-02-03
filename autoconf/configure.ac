@@ -581,6 +581,10 @@ AC_CHECK_FUNCS([malloc_zone_statistics])
 AC_SEARCH_LIBS(mallinfo,malloc,
                AC_DEFINE([HAVE_MALLINFO],[1],[Define if mallinfo() is available on this platform.]))
 
+AC_CHECK_HEADERS([benchmark/benchmark_api.h],
+	AC_SUBST(HAVE_GBENCHMARK, 1),
+	AC_SUBST(HAVE_GBENCHMARK, 0))
+
 dnl **************************************************************************
 dnl Test for tcmalloc
 dnl **************************************************************************
@@ -919,6 +923,8 @@ AC_CONFIG_MAKEFILE(test/Makefile.tests)
 AC_CONFIG_MAKEFILE(test/Concrete/Makefile)
 AC_CONFIG_MAKEFILE(tools/Makefile)
 AC_CONFIG_MAKEFILE(unittests/Makefile)
+AC_CONFIG_MAKEFILE(performancetests/Makefile)
+
 
 dnl This must be last
 AC_OUTPUT

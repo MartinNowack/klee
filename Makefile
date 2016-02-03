@@ -53,6 +53,8 @@ cscope.files:
 test::
 	-(cd test/ && make)
 
+performance::
+	-(cd performancetests/ && make)
 .PHONY: klee-cov
 klee-cov:
 	rm -rf klee-cov
