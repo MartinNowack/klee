@@ -15,6 +15,9 @@
 /* Using Z3 Solver backend */
 #undef ENABLE_Z3
 
+/* Define to 1 if you have the <benchmark/benchmark_api.h> header file. */
+#undef HAVE_BENCHMARK_BENCHMARK_API_H
+
 /* Define if Cap'n'Proto is available on this platform. */
 #undef HAVE_CAPNPROTO
 
