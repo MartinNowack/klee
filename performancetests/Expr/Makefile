@@ -3,7 +3,7 @@
 LEVEL := ../..
 
 TESTNAME := Expr
-USEDLIBS := kleaverExpr.a kleeBasic.a kleeSupport.a
+USEDLIBS :=kleaverSolver.a kleaverExpr.a kleeBasic.a kleeSupport.a
 LINK_COMPONENTS := support
 
 include $(LEVEL)/Makefile.common
@@ -19,6 +19,6 @@ $(PerfTest):  $(ObjectsO) $(ProjLibsPaths) $(LLVMLibsPaths)
 	$(StripWarnMsg)
 
 all:: $(PerfTest)
-
+	./$(PerfTest)
 LIBS += $(STP_LDFLAGS)
 LIBS += $(CAPNPROTO_LDFLAGS)
