@@ -13,11 +13,11 @@
 #include "klee/util/SharedMemory.h"
 #include "klee/util/Serialization.h"
 #include "llvm/Support/FileSystem.h"
+
+#include <fstream>
 #include <limits>
 #include <sys/wait.h>
 #include <unistd.h>
-
-#include <fstream>
 
 using namespace klee;
 
@@ -89,6 +89,12 @@ int main(int argc, char **argv, char **envp) {
       return 0;
     }
     request.unlock();
+    coreSolver->impl->setIncrementalStatus(request.getIncremental());
+
+    if (!request.getIncremental() ||
+        request.getIncrementalLevel() < std::numeric_limits<uint32_t>::max())
+      coreSolver->impl->clearSolverStack();
+
     // Acquire query from shared memory
     ConstraintManager cm;
     std::vector<const Array *> arrays;
@@ -106,8 +112,7 @@ int main(int argc, char **argv, char **envp) {
       break;
     }
     case SharedMem::CONSTRAINT_LOG: {
-      auto res = coreSolver->getConstraintLog(query);
-
+      auto res = solver->getConstraintLog(query);
       serializer.serializeConstraintLogAnswer(res);
       free(res);
       break;
@@ -115,6 +120,7 @@ int main(int argc, char **argv, char **envp) {
     case SharedMem::COMPUTE_TRUTH: {
       bool isValid;
       bool success = solver->impl->computeTruth(query, isValid);
+      assert(success);
 
       serializer.serializeComputeTruthAnswer(isValid, success);
       break;
@@ -122,6 +128,7 @@ int main(int argc, char **argv, char **envp) {
     case SharedMem::COMPUTE_VALUE: {
       ref<Expr> result;
       bool success = solver->impl->computeValue(query, result);
+      assert(success);
 
       serializer.serializeComputeValueAnswer(result, success);
       break;

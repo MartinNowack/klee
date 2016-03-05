@@ -69,6 +69,8 @@ private:
   double timeout;
   bool useForkedSTP;
   SolverRunStatus runStatusCode;
+  std::vector<size_t> stackIndex;
+  bool incremental;
 
 public:
   STPSolverImpl(bool _useForkedSTP, bool _optimizeDivides = true);
@@ -83,13 +85,23 @@ public:
                             const std::vector<const Array *> &objects,
                             std::vector<std::vector<unsigned char> > &values,
                             bool &hasSolution);
+  bool computePartialInitialValues(
+      const Query &, const std::vector<const Array *> &objects,
+      std::vector<std::vector<unsigned char> > &values, bool &hasSolution);
+  void popStack(size_t index);
+
   SolverRunStatus getOperationStatusCode();
+  void setIncrementalStatus(bool enable);
+  bool getIncrementalStatus();
+
+  void clearSolverStack();
 };
 
 STPSolverImpl::STPSolverImpl(bool _useForkedSTP, bool _optimizeDivides)
     : vc(vc_createValidityChecker()),
       builder(new STPBuilder(vc, _optimizeDivides)), timeout(0.0),
-      useForkedSTP(_useForkedSTP), runStatusCode(SOLVER_RUN_STATUS_FAILURE) {
+      useForkedSTP(_useForkedSTP), runStatusCode(SOLVER_RUN_STATUS_FAILURE),
+      incremental(false) {
   assert(vc && "unable to create validity checker");
   assert(builder && "unable to create STPBuilder");
 
@@ -120,7 +132,8 @@ STPSolverImpl::STPSolverImpl(bool _useForkedSTP, bool _optimizeDivides)
 
 STPSolverImpl::~STPSolverImpl() {
   // Detach the memory region.
-  shmdt(shared_memory_ptr);
+  if (shared_memory_ptr)
+    shmdt(shared_memory_ptr);
   shared_memory_ptr = 0;
   shared_memory_id = 0;
 
@@ -131,17 +144,38 @@ STPSolverImpl::~STPSolverImpl() {
 
 /***/
 
+STPSolver::STPSolver(bool useForkedSTP, bool optimizeDivides)
+    : Solver(new STPSolverImpl(useForkedSTP, optimizeDivides)) {}
+
+char *STPSolver::getConstraintLog(const Query &query) {
+  return impl->getConstraintLog(query);
+}
+
+void STPSolver::setCoreSolverTimeout(double timeout) {
+  impl->setCoreSolverTimeout(timeout);
+}
+
+/***/
+
 char *STPSolverImpl::getConstraintLog(const Query &query) {
-  vc_push(vc);
-  for (std::vector<ref<Expr> >::const_iterator it = query.constraints.begin(),
-                                               ie = query.constraints.end();
-       it != ie; ++it)
-    vc_assertFormula(vc, builder->construct(*it));
+  auto emptyConstraints = query.constraints.empty();
+  if (!emptyConstraints) {
+    vc_push(vc);
+    auto lastIndex = (!stackIndex.empty() ? stackIndex.back() : 0);
+    stackIndex.push_back(lastIndex + query.constraints.size());
+    for (std::vector<ref<Expr> >::const_iterator it = query.constraints.begin(),
+                                                 ie = query.constraints.end();
+         it != ie; ++it)
+      vc_assertFormula(vc, builder->construct(*it));
+  }
+
   assert(query.expr == ConstantExpr::alloc(0, Expr::Bool) &&
          "Unexpected expression in query!");
 
   char *buffer;
   unsigned long length;
+
+  vc_push(vc);
   vc_printQueryStateToBuffer(vc, builder->getFalse(), &buffer, &length, false);
   vc_pop(vc);
 
@@ -339,27 +373,58 @@ runAndGetCexForked(::VC vc, STPBuilder *builder, ::VCExpr q,
 bool STPSolverImpl::computeInitialValues(
     const Query &query, const std::vector<const Array *> &objects,
     std::vector<std::vector<unsigned char> > &values, bool &hasSolution) {
+  assert(stackIndex.empty() || incremental);
+
+  auto success =
+      computePartialInitialValues(query, objects, values, hasSolution);
+
+  if (!incremental) {
+    clearSolverStack();
+  }
+
+  return success;
+}
+
+bool STPSolverImpl::computePartialInitialValues(
+    const Query &query, const std::vector<const Array *> &objects,
+    std::vector<std::vector<unsigned char> > &values, bool &hasSolution) {
   runStatusCode = SOLVER_RUN_STATUS_FAILURE;
 
   TimerStatIncrementer t(stats::queryTime);
 
   vc_push(vc);
 
-  for (ConstraintManager::const_iterator it = query.constraints.begin(),
-                                         ie = query.constraints.end();
-       it != ie; ++it)
-    vc_assertFormula(vc, builder->construct(*it));
+  bool emptyConstraints = query.constraints.empty();
+  if (incremental && !emptyConstraints) {
+    vc_push(vc);
 
+    for (ConstraintManager::const_iterator it = query.constraints.begin(),
+                                           ie = query.constraints.end();
+         it != ie; ++it) {
+      vc_assertFormula(vc, builder->construct(*it));
+    }
+
+    auto lastIndex = (!stackIndex.empty() ? stackIndex.back() : 0);
+    stackIndex.push_back(lastIndex + query.constraints.size());
+  }
   ++stats::queries;
   ++stats::queryCounterexamples;
 
+  vc_push(vc);
+  if (!incremental) {
+    for (ConstraintManager::const_iterator it = query.constraints.begin(),
+                                           ie = query.constraints.end();
+         it != ie; ++it) {
+      vc_assertFormula(vc, builder->construct(*it));
+    }
+  }
   ExprHandle stp_e = builder->construct(query.expr);
-
   if (DebugDumpSTPQueries) {
     char *buf;
     unsigned long len;
     vc_printQueryStateToBuffer(vc, stp_e, &buf, &len, false);
     klee_warning("STP query:\n%.*s\n", (unsigned)len, buf);
+    free(buf);
   }
 
   bool success;
@@ -374,6 +439,8 @@ bool STPSolverImpl::computeInitialValues(
     success = true;
   }
 
+  vc_pop(vc);
+
   if (success) {
     if (hasSolution)
       ++stats::queriesInvalid;
@@ -381,24 +448,30 @@ bool STPSolverImpl::computeInitialValues(
       ++stats::queriesValid;
   }
 
-  vc_pop(vc);
-
   return success;
+}
+
+void STPSolverImpl::popStack(size_t index) {
+  while (!stackIndex.empty()) {
+    auto val = stackIndex.back();
+    stackIndex.pop_back();
+    vc_pop(vc);
+    if (val == index)
+      return;
+  }
 }
 
 SolverImpl::SolverRunStatus STPSolverImpl::getOperationStatusCode() {
   return runStatusCode;
 }
 
-STPSolver::STPSolver(bool useForkedSTP, bool optimizeDivides)
-    : Solver(new STPSolverImpl(useForkedSTP, optimizeDivides)) {}
+void STPSolverImpl::setIncrementalStatus(bool enable) { incremental = enable; }
 
-char *STPSolver::getConstraintLog(const Query &query) {
-  return impl->getConstraintLog(query);
-}
+bool STPSolverImpl::getIncrementalStatus() { return incremental; }
 
-void STPSolver::setCoreSolverTimeout(double timeout) {
-  impl->setCoreSolverTimeout(timeout);
+void STPSolverImpl::clearSolverStack() {
+  // remove every item from the stack
+  popStack(0);
 }
 }
 #endif // ENABLE_STP

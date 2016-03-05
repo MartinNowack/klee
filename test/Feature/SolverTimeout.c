@@ -1,6 +1,6 @@
 // RUN: %llvmgcc %s -emit-llvm -O0 -c -o %t1.bc
 // RUN: rm -rf %t.klee-out
-// RUN: %klee --output-dir=%t.klee-out --max-solver-time=1 %t1.bc
+// RUN: %klee --output-dir=%t.klee-out --max-solver-time=1 %t1.bc 2>&1 | FileCheck %s
 // FIXME: This test occasionally fails when using Z3 4.4.1 but
 // not when using Z3 from the master branch. So disable the test for now.
 // REQUIRES: stp
@@ -13,7 +13,9 @@ int main() {
 
   if (x*x*x*x*x*x*x*x*x*x*x*x*x*x*x*x + (x*x % (x+12)) == y*y*y*y*y*y*y*y*y*y*y*y*y*y*y*y % i)
     printf("Yes\n");
+  //  CHECK-NOT: Yes
   else printf("No\n");
-  
+  //  CHECK-NOT: No
+
   return 0;
 }

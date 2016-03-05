@@ -1,5 +1,4 @@
-//===-- QueryLoggingSolver.h
-//---------------------------------------------------===//
+//===-- QueryLoggingSolver.h ----------------------------------------------===//
 //
 //                     The KLEE Symbolic Virtual Machine
 //
@@ -62,6 +61,14 @@ public:
                      const std::string &commentSign, int queryTimeToLog);
 
   virtual ~QueryLoggingSolver();
+  /// implementation of the SolverImpl interface
+  void setIncrementalStatus(bool enable) {
+    solver->impl->setIncrementalStatus(enable);
+  }
+
+  bool getIncrementalStatus() { return solver->impl->getIncrementalStatus(); }
+
+  void clearSolverStack() { solver->impl->clearSolverStack(); }
 
   /// implementation of the SolverImpl interface
   bool computeTruth(const Query &query, bool &isValid);

@@ -104,6 +104,22 @@ namespace klee {
     }
 
     virtual void setCoreSolverTimeout(double timeout) {};
+
+    /// Enable/Disable incremental solver functionality
+    virtual void setIncrementalStatus(bool enable) {
+      assert(0 && "Incremental feature not implemented");
+    }
+
+    /// Return if incremental solving is used or not
+    virtual bool getIncrementalStatus() {
+      assert(0 && "Incremental feature not implemented");
+      return false;
+    }
+
+    /// Clear incremental solver stack
+    virtual void clearSolverStack() {
+      assert(0 && "Incremental feature not implemented");
+    }
 };
 
 }
