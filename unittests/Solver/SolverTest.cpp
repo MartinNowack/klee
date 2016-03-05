@@ -128,7 +128,7 @@ void testOpcode(Solver &solver, bool tryBool = true, bool tryZero = true,
 }
 
 TEST(SolverTest, Evaluation) {
-  Solver *solver = klee::createCoreSolver(CoreSolverToUse);
+  Solver *solver = klee::createCoreSolver(CoreSolverToUse, &ac);
 
   solver = createCexCachingSolver(solver);
   solver = createCachingSolver(solver);
@@ -137,7 +137,46 @@ TEST(SolverTest, Evaluation) {
   testOpcode<SelectExpr>(*solver);
   testOpcode<ZExtExpr>(*solver);
   testOpcode<SExtExpr>(*solver);
-  
+
+  testOpcode<AddExpr>(*solver);
+  testOpcode<SubExpr>(*solver);
+  testOpcode<MulExpr>(*solver, false, true, 8);
+  testOpcode<SDivExpr>(*solver, false, false, 8);
+  testOpcode<UDivExpr>(*solver, false, false, 8);
+  testOpcode<SRemExpr>(*solver, false, false, 8);
+  testOpcode<URemExpr>(*solver, false, false, 8);
+  testOpcode<ShlExpr>(*solver, false);
+  testOpcode<LShrExpr>(*solver, false);
+  testOpcode<AShrExpr>(*solver, false);
+  testOpcode<AndExpr>(*solver);
+  testOpcode<OrExpr>(*solver);
+  testOpcode<XorExpr>(*solver);
+
+  testOpcode<EqExpr>(*solver);
+  testOpcode<NeExpr>(*solver);
+  testOpcode<UltExpr>(*solver);
+  testOpcode<UleExpr>(*solver);
+  testOpcode<UgtExpr>(*solver);
+  testOpcode<UgeExpr>(*solver);
+  testOpcode<SltExpr>(*solver);
+  testOpcode<SleExpr>(*solver);
+  testOpcode<SgtExpr>(*solver);
+  testOpcode<SgeExpr>(*solver);
+
+  delete solver;
+}
+
+TEST(SolverTest, EvaluationProcess) {
+  Solver *solver = new ClientProcessAdapterSolver(&ac);
+
+  solver = createCexCachingSolver(solver);
+  solver = createCachingSolver(solver);
+  solver = createIndependentSolver(solver);
+
+  testOpcode<SelectExpr>(*solver);
+  testOpcode<ZExtExpr>(*solver);
+  testOpcode<SExtExpr>(*solver);
+
   testOpcode<AddExpr>(*solver);
   testOpcode<SubExpr>(*solver);
   testOpcode<MulExpr>(*solver, false, true, 8);

@@ -36,3 +36,5 @@ endif
 ifeq ($(HAVE_ZLIB),1)
   LIBS += -lz
 endif
+
+LIBS += -lcapnp -lkj $(CAPNPROTO_LDFLAGS) -lrt

@@ -58,10 +58,18 @@ static klee::Solver *handleMetaSMT() {
   return coreSolver;
 }
 #endif /* ENABLE_METASMT */
-
+namespace {
+llvm::cl::opt<bool>
+    OneForkProcess("one-fork-process",
+                   llvm::cl::desc("One fork process (default=on)"),
+                   llvm::cl::init(true));
+}
 namespace klee {
 
-Solver *createCoreSolver(CoreSolverType cst) {
+Solver *createCoreSolver(CoreSolverType cst, ArrayCache *cache) {
+  if (OneForkProcess)
+    return new ClientProcessAdapterSolver(cache, CoreSolverOptimizeDivides);
+
   switch (cst) {
   case STP_SOLVER:
 #ifdef ENABLE_STP
@@ -94,6 +102,7 @@ Solver *createCoreSolver(CoreSolverType cst) {
     return NULL;
   default:
     llvm_unreachable("Unsupported CoreSolverType");
+    return NULL;
   }
 }
 }

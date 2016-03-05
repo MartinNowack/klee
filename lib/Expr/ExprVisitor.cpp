@@ -38,7 +38,7 @@ ref<Expr> ExprVisitor::visit(const ref<Expr> &e) {
 }
 
 ref<Expr> ExprVisitor::visitActual(const ref<Expr> &e) {
-  if (isa<ConstantExpr>(e)) {    
+  if (isa<ConstantExpr>(e)) {
     return e;
   } else {
     Expr &ep = *e.get();
@@ -255,4 +255,3 @@ ExprVisitor::Action ExprVisitor::visitSgt(const SgtExpr&) {
 ExprVisitor::Action ExprVisitor::visitSge(const SgeExpr&) {
   return Action::doChildren(); 
 }
-

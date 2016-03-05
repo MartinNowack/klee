@@ -26,15 +26,17 @@
 #include <sys/ipc.h>
 #include <sys/shm.h>
 
+bool IgnoreSolverFailures;
 namespace {
 
 llvm::cl::opt<bool> DebugDumpSTPQueries(
     "debug-dump-stp-queries", llvm::cl::init(false),
     llvm::cl::desc("Dump every STP query to stderr (default=off)"));
 
-llvm::cl::opt<bool> IgnoreSolverFailures(
-    "ignore-solver-failures", llvm::cl::init(false),
-    llvm::cl::desc("Ignore any solver failures (default=off)"));
+llvm::cl::opt<bool, true> IgnoreSolverFailuresCmd(
+    "ignore-solver-failures",
+    llvm::cl::desc("Ignore any solver failures (default=off)"),
+    llvm::cl::location(IgnoreSolverFailures), llvm::cl::init(false));
 }
 
 #define vc_bvBoolExtract IAMTHESPAWNOFSATAN

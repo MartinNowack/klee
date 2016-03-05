@@ -47,7 +47,7 @@ AC_CANONICAL_TARGET
 
 dnl Determine the platform type and cache its value. This helps us configure
 dnl the System library to the correct build platform.
-AC_CACHE_CHECK([type of operating system we're going to host on],
+AC_CACHE_CHECK([type of operating system we''re going to host on],
                [klee_cv_os_type],
 [case $host in
   *-*-linux*)
@@ -650,6 +650,29 @@ AS_IF([test "x$have_zlib" = "xyes"],
           AC_SUBST(HAVE_ZLIB, 0)
           ])
 ])
+
+dnl **************************************************************************
+dnl Find an install of Cap'n Proto
+dnl **************************************************************************
+
+SAVE_CXXFLAGS=$CXXFLAGS
+SAVE_CPPFLAGS=$CPPFLAGS
+CXXFLAGS="$CXXFLAGS -std=c++11"
+CPPFLAGS="$CPPFLAGS -std=c++11"
+AC_CHECK_HEADERS([capnp/serialize.h])
+AC_CHECK_LIB(capnp,__cxa_get_globals,
+               AC_DEFINE([HAVE_CAPNPROTO],[1],[Define if Cap'n'Proto is available on this platform.]))
+CXXFLAGS=$SAVE_CXXFLAGS
+CPPFLAGS=$SAVE_CPPFLAGS
+
+AC_CHECK_PROG(CAPNP,capnp,1)
+if test x"${CAPNP}" != x"1" ; then
+ AC_MSG_ERROR(["Please install Capnp and make sure it's in your path".])
+fi
+if test "X$HAVE_CAPNPROTO" != X0 ; then
+  CAPNPROTO_LDFLAGS="-lcapnp -lkj"
+fi
+AC_SUBST(CAPNPROTO_LDFLAGS)
 
 dnl **************************************************************************
 dnl Find an install of STP
