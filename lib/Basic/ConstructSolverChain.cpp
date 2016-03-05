@@ -66,7 +66,7 @@ Solver *constructSolverChain(Solver *coreSolver,
                  querySMT2LogPath.c_str());
   }
   if (DebugCrossCheckCoreSolverWith != NO_SOLVER) {
-    Solver *oracleSolver = createCoreSolver(DebugCrossCheckCoreSolverWith);
+    Solver *oracleSolver = createCoreSolver(DebugCrossCheckCoreSolverWith, nullptr /* XXX fix this*/);
     solver = createValidatingSolver(/*s=*/solver, /*oracle=*/oracleSolver);
   }
 

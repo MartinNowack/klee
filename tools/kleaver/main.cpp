@@ -19,6 +19,7 @@
 #include "klee/Statistics.h"
 #include "klee/CommandLine.h"
 #include "klee/Common.h"
+#include "klee/util/ArrayCache.h"
 #include "klee/util/ExprPPrinter.h"
 #include "klee/util/ExprVisitor.h"
 #include "klee/util/ExprSMTLIBPrinter.h"
@@ -213,7 +214,8 @@ static bool EvaluateInputAST(const char *Filename,
   if (!success)
     return false;
 
-  Solver *coreSolver = klee::createCoreSolver(CoreSolverToUse);
+  ArrayCache cache;
+  Solver *coreSolver = klee::createCoreSolver(CoreSolverToUse, &cache);
 
   if (CoreSolverToUse != DUMMY_SOLVER) {
     if (0 != MaxCoreSolverTime) {

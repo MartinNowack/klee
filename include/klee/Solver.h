@@ -243,6 +243,27 @@ namespace klee {
   };
 #endif // ENABLE_Z3
 
+  /// STPSolver - A complete solver based on STP.
+  class ClientProcessAdapterSolver : public Solver {
+  public:
+    /// STPSolver - Construct a new STPSolver.
+    ///
+    /// \param useForkedSTP - Whether STP should be run in a separate process
+    /// (required for using timeouts).
+    /// \param optimizeDivides - Whether constant division operations should
+    /// be optimized into add/shift/multiply operations.
+    ClientProcessAdapterSolver(ArrayCache *cache, bool optimizeDivides = true);
+
+    /// getConstraintLog - Return the constraint log for the given state in CVC
+    /// format.
+    virtual char *getConstraintLog(const Query &);
+
+    /// setCoreSolverTimeout - Set constraint solver timeout delay to the given
+    /// value; 0
+    /// is off.
+    virtual void setCoreSolverTimeout(double timeout);
+  };
+
 #ifdef ENABLE_METASMT
   
   template<typename SolverContext>
@@ -312,7 +333,8 @@ namespace klee {
   Solver *createDummySolver();
 
   // Create a solver based on the supplied ``CoreSolverType``.
-  Solver *createCoreSolver(CoreSolverType cst);
+  Solver *createCoreSolver(CoreSolverType cst, ArrayCache *cache,
+                           bool forked = true);
 }
 
 #endif

@@ -18,3 +18,7 @@ ifneq ($(ENABLE_Z3),0)
 endif
 
 include $(PROJ_SRC_ROOT)/MetaSMT.mk
+LIBS += $(CAPNPROTO_LDFLAGS)
+
+# SharedMemory
+LIBS += -lrt

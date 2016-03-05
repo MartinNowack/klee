@@ -633,10 +633,13 @@ ENABLE_Z3
 STP_LDFLAGS
 STP_CFLAGS
 ENABLE_STP
+CAPNPROTO_LDFLAGS
+CAPNP
 ZLIB_LIB
 HAVE_ZLIB
 TCMALLOC_LIB
 HAVE_TCMALLOC
+HAVE_GBENCHMARK
 CXXCPP
 HAVE_SELINUX
 EGREP
@@ -3464,8 +3467,8 @@ test -n "$target_alias" &&
     NONENONEs,x,x, &&
   program_prefix=${target_alias}-
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking type of operating system we're going to host on" >&5
-$as_echo_n "checking type of operating system we're going to host on... " >&6; }
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking type of operating system we''re going to host on" >&5
+$as_echo_n "checking type of operating system we''re going to host on... " >&6; }
 if ${klee_cv_os_type+:} false; then :
   $as_echo_n "(cached) " >&6
 else
@@ -4955,6 +4958,23 @@ $as_echo "#define HAVE_MALLINFO 1" >>confdefs.h
 fi
 
 
+for ac_header in benchmark/benchmark_api.h
+do :
+  ac_fn_cxx_check_header_mongrel "$LINENO" "benchmark/benchmark_api.h" "ac_cv_header_benchmark_benchmark_api_h" "$ac_includes_default"
+if test "x$ac_cv_header_benchmark_benchmark_api_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_BENCHMARK_BENCHMARK_API_H 1
+_ACEOF
+ HAVE_GBENCHMARK=1
+
+else
+  HAVE_GBENCHMARK=0
+
+fi
+
+done
+
+
 
 
 # Check whether --with-tcmalloc was given.
@@ -5180,6 +5200,113 @@ else
 fi
 
 fi
+
+
+SAVE_CXXFLAGS=$CXXFLAGS
+SAVE_CPPFLAGS=$CPPFLAGS
+CXXFLAGS="$CXXFLAGS -std=c++11"
+CPPFLAGS="$CPPFLAGS -std=c++11"
+for ac_header in capnp/serialize.h
+do :
+  ac_fn_cxx_check_header_mongrel "$LINENO" "capnp/serialize.h" "ac_cv_header_capnp_serialize_h" "$ac_includes_default"
+if test "x$ac_cv_header_capnp_serialize_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_CAPNP_SERIALIZE_H 1
+_ACEOF
+
+fi
+
+done
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for __cxa_get_globals in -lcapnp" >&5
+$as_echo_n "checking for __cxa_get_globals in -lcapnp... " >&6; }
+if ${ac_cv_lib_capnp___cxa_get_globals+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lcapnp  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char __cxa_get_globals ();
+int
+main ()
+{
+return __cxa_get_globals ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_link "$LINENO"; then :
+  ac_cv_lib_capnp___cxa_get_globals=yes
+else
+  ac_cv_lib_capnp___cxa_get_globals=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_capnp___cxa_get_globals" >&5
+$as_echo "$ac_cv_lib_capnp___cxa_get_globals" >&6; }
+if test "x$ac_cv_lib_capnp___cxa_get_globals" = xyes; then :
+
+$as_echo "#define HAVE_CAPNPROTO 1" >>confdefs.h
+
+fi
+
+CXXFLAGS=$SAVE_CXXFLAGS
+CPPFLAGS=$SAVE_CPPFLAGS
+
+# Extract the first word of "capnp", so it can be a program name with args.
+set dummy capnp; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_prog_CAPNP+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test -n "$CAPNP"; then
+  ac_cv_prog_CAPNP="$CAPNP" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_prog_CAPNP="1"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+fi
+fi
+CAPNP=$ac_cv_prog_CAPNP
+if test -n "$CAPNP"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $CAPNP" >&5
+$as_echo "$CAPNP" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+if test x"${CAPNP}" != x"1" ; then
+ as_fn_error $? "\"Please install Capnp and make sure it's in your path\"." "$LINENO" 5
+fi
+if test "X$HAVE_CAPNPROTO" != X0 ; then
+  CAPNPROTO_LDFLAGS="-lcapnp -lkj"
+fi
+
 
 
 ENABLE_STP=0
@@ -5680,6 +5807,10 @@ ac_config_commands="$ac_config_commands tools/Makefile"
 
 
 ac_config_commands="$ac_config_commands unittests/Makefile"
+
+
+ac_config_commands="$ac_config_commands performancetests/Makefile"
+
 
 
 
@@ -6395,6 +6526,7 @@ do
     "test/Concrete/Makefile") CONFIG_COMMANDS="$CONFIG_COMMANDS test/Concrete/Makefile" ;;
     "tools/Makefile") CONFIG_COMMANDS="$CONFIG_COMMANDS tools/Makefile" ;;
     "unittests/Makefile") CONFIG_COMMANDS="$CONFIG_COMMANDS unittests/Makefile" ;;
+    "performancetests/Makefile") CONFIG_COMMANDS="$CONFIG_COMMANDS performancetests/Makefile" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac
@@ -6963,6 +7095,8 @@ $as_echo "$as_me: executing $ac_file commands" >&6;}
    ${SHELL} ${llvm_src}/autoconf/install-sh -m 0644 -c ${srcdir}/tools/Makefile tools/Makefile ;;
     "unittests/Makefile":C) ${llvm_src}/autoconf/mkinstalldirs `dirname unittests/Makefile`
    ${SHELL} ${llvm_src}/autoconf/install-sh -m 0644 -c ${srcdir}/unittests/Makefile unittests/Makefile ;;
+    "performancetests/Makefile":C) ${llvm_src}/autoconf/mkinstalldirs `dirname performancetests/Makefile`
+   ${SHELL} ${llvm_src}/autoconf/install-sh -m 0644 -c ${srcdir}/performancetests/Makefile performancetests/Makefile ;;
 
   esac
 done # for ac_tag

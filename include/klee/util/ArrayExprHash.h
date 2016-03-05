@@ -40,14 +40,18 @@ struct ArrayCmpFn {
 };  
   
 struct UpdateNodeHashFn  {
-  unsigned operator()(const UpdateNode* un) const {
-    return(un ? un->hash() : 0);
+  unsigned
+  operator()(const std::pair<const UpdateNode *, const Array *> un_a) const {
+    return (un_a.first && un_a.second ? un_a.first->hash() + un_a.second->hash()
+                                      : 0);
   }
 };
     
 struct UpdateNodeCmpFn {
-  bool operator()(const UpdateNode* un1, const UpdateNode* un2) const {
-    return(un1 == un2);
+  bool
+  operator()(const std::pair<const UpdateNode *, const Array *> un_a1,
+             const std::pair<const UpdateNode *, const Array *> un_a2) const {
+    return (un_a1.first == un_a2.first && un_a1.second == un_a2.second);
   }
 };  
 
@@ -62,17 +66,19 @@ public:
   virtual ~ArrayExprHash() {};
    
   bool lookupArrayExpr(const Array* array, T& exp) const;
-  void hashArrayExpr(const Array* array, T& exp);  
-  
-  bool lookupUpdateNodeExpr(const UpdateNode* un, T& exp) const;
-  void hashUpdateNodeExpr(const UpdateNode* un, T& exp);  
-  
+  void hashArrayExpr(const Array* array, T& exp);
+
+  bool lookupUpdateNodeExpr(const UpdateNode *un, const Array *array,
+                            T &exp) const;
+  void hashUpdateNodeExpr(const UpdateNode *un, const Array *array, T &exp);
+
 protected:
   typedef unordered_map<const Array*, T, ArrayHashFn, ArrayCmpFn> ArrayHash;
   typedef typename ArrayHash::iterator ArrayHashIter;
   typedef typename ArrayHash::const_iterator ArrayHashConstIter;
-  
-  typedef unordered_map<const UpdateNode*, T, UpdateNodeHashFn, UpdateNodeCmpFn> UpdateNodeHash;
+
+  typedef unordered_map<std::pair<const UpdateNode *, const Array *>, T,
+                        UpdateNodeHashFn, UpdateNodeCmpFn> UpdateNodeHash;
   typedef typename UpdateNodeHash::iterator UpdateNodeHashIter;
   typedef typename UpdateNodeHash::const_iterator UpdateNodeHashConstIter;
   
@@ -109,9 +115,9 @@ void ArrayExprHash<T>::hashArrayExpr(const Array* array, T& exp) {
   _array_hash[array] = exp;
 }
 
-template<class T>
-bool ArrayExprHash<T>::lookupUpdateNodeExpr(const UpdateNode* un, T& exp) const
-{
+template <class T>
+bool ArrayExprHash<T>::lookupUpdateNodeExpr(const UpdateNode *un,
+                                            const Array *array, T &exp) const {
   bool res = false;
   
 #ifdef DEBUG
@@ -119,7 +125,8 @@ bool ArrayExprHash<T>::lookupUpdateNodeExpr(const UpdateNode* un, T& exp) const
 #endif
   
   assert(un);
-  UpdateNodeHashConstIter it = _update_node_hash.find(un);
+  UpdateNodeHashConstIter it =
+      _update_node_hash.find(std::make_pair(un, array));
   if (it != _update_node_hash.end()) {
     exp = it->second;
     res = true;
@@ -127,15 +134,15 @@ bool ArrayExprHash<T>::lookupUpdateNodeExpr(const UpdateNode* un, T& exp) const
   return(res);   
 }
 
-template<class T>
-void ArrayExprHash<T>::hashUpdateNodeExpr(const UpdateNode* un, T& exp) 
-{
+template <class T>
+void ArrayExprHash<T>::hashUpdateNodeExpr(const UpdateNode *un,
+                                          const Array *array, T &exp) {
 #ifdef DEBUG
   TimerStatIncrementer t(stats::arrayHashTime);
 #endif
-  
-  assert(un);
-  _update_node_hash[un] = exp;
+
+  assert(un && array);
+  _update_node_hash[std::make_pair(un, array)] = exp;
 }
 
 }

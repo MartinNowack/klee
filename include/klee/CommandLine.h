@@ -45,12 +45,13 @@ enum QueryLoggingSolverType
 extern llvm::cl::list<QueryLoggingSolverType> queryLoggingOptions;
 
 enum CoreSolverType {
-  STP_SOLVER,
-  METASMT_SOLVER,
-  DUMMY_SOLVER,
-  Z3_SOLVER,
-  NO_SOLVER
+  STP_SOLVER = 0,
+  METASMT_SOLVER = 1,
+  DUMMY_SOLVER = 2,
+  Z3_SOLVER = 3,
+  NO_SOLVER = 4
 };
+
 extern llvm::cl::opt<CoreSolverType> CoreSolverToUse;
 
 extern llvm::cl::opt<CoreSolverType> DebugCrossCheckCoreSolverWith;
@@ -78,4 +79,3 @@ static bool optionIsSet(llvm::cl::list<T> list, T option)
 }
 
 #endif	/* KLEE_COMMANDLINE_H */
-

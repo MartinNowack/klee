@@ -1,4 +1,4 @@
-#===-- tools/kleaver/Makefile ------------------------------*- Makefile -*--===#
+#===-- tools/solver-sa/Makefile ----------------------------*- Makefile -*--===#
 #
 #                     The KLEE Symbolic Virtual Machine
 #
@@ -8,13 +8,13 @@
 #===------------------------------------------------------------------------===#
 
 LEVEL=../..
-TOOLNAME = kleaver
+TOOLNAME = solver-sa
 
 include $(LEVEL)/Makefile.config
 
 # FIXME: Ideally we wouldn't have any LLVM dependencies here, which
 # means kicking out klee's Support.
-USEDLIBS = kleeBasic.a kleaverSolver.a kleaverExpr.a kleeSupport.a 
+USEDLIBS = kleaverSolver.a kleaverExpr.a kleeSupport.a kleeBasic.a 
 LINK_COMPONENTS = support
 
 include $(LEVEL)/Makefile.common
@@ -29,12 +29,8 @@ endif
 
 include $(PROJ_SRC_ROOT)/MetaSMT.mk
 
+LIBS += -lcapnp -lkj $(CAPNPROTO_LDFLAGS) -lrt
+
 ifeq ($(HAVE_TCMALLOC),1)
   LIBS += $(TCMALLOC_LIB)
 endif
-
-ifeq ($(HAVE_ZLIB),1)
-  LIBS += -lz
-endif
-
-LIBS += -lcapnp -lkj $(CAPNPROTO_LDFLAGS) -lrt

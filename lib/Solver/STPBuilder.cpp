@@ -476,15 +476,14 @@ ExprHandle STPBuilder::getInitialRead(const Array *root, unsigned index) {
   else {
       // FIXME: This really needs to be non-recursive.
       ::VCExpr un_expr;
-      bool hashed = _arr_hash.lookupUpdateNodeExpr(un, un_expr);
-      
+      bool hashed = _arr_hash.lookupUpdateNodeExpr(un, root, un_expr);
+
       if (!hashed) {
-	un_expr = vc_writeExpr(vc,
-                               getArrayForUpdate(root, un->next),
-                               construct(un->index, 0),
-                               construct(un->value, 0));
-	
-	_arr_hash.hashUpdateNodeExpr(un, un_expr);
+        un_expr =
+            vc_writeExpr(vc, getArrayForUpdate(root, un->next),
+                         construct(un->index, 0), construct(un->value, 0));
+
+        _arr_hash.hashUpdateNodeExpr(un, root, un_expr);
       }
       
       return(un_expr);

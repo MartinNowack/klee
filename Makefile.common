@@ -52,6 +52,7 @@ CXX := $(KLEE_HOST_CXX_COMPILER)
 
 # Needed to build runtime library using clang (gnu89 is the gcc default)
 C.Flags += -std=gnu89
+C.Flags += -fno-omit-frame-pointer
 
 # Build using C++11 if requested
 ifeq ($(KLEE_USE_CXX11),1)
@@ -91,3 +92,10 @@ ifneq ("X$(MODULE_NAME)$(BYTECODE_LIBRARY)X","XX")
   CFLAGS := $(filter-out -coverage,$(CFLAGS))
   CFLAGS := $(filter-out --coverage,$(CFLAGS))
 endif
+
+# For Cap'n Proto
+CXX.Flags += $(CAPNPROTO_CFLAGS)
+CXX.Flags += -fno-omit-frame-pointer
+
+# Current Tool Build Dir
+CXX.Flags += -DKLEE_TOOLDIR=\"$(ToolDir)\"
