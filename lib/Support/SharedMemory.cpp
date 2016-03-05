@@ -36,6 +36,9 @@ struct Sync {
   size_t usedSize;
 
   klee::SharedMem::command command;
+  bool incremental;
+  // Level 0 .. 2^32-1
+  uint32_t incrementalLevel;
 };
 
 pthread_mutexattr_t attrmutex;
@@ -243,6 +246,26 @@ void SharedMem::setCommand(command c) {
 SharedMem::command SharedMem::getCommand() {
   assert(addr);
   return ((Sync *)addr)->command;
+}
+
+void SharedMem::setIncremental(bool inc) {
+  assert(addr);
+  ((Sync *)addr)->incremental = inc;
+}
+
+bool SharedMem::getIncremental() {
+  assert(addr);
+  return ((Sync *)addr)->incremental;
+}
+
+void SharedMem::setIncrementalLevel(uint32_t level) {
+  assert(addr);
+  ((Sync *)addr)->incrementalLevel = level;
+}
+
+uint32_t SharedMem::getIncrementalLevel() {
+  assert(addr);
+  return ((Sync *)addr)->incrementalLevel;
 }
 
 } // namespace klee

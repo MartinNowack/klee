@@ -31,6 +31,8 @@ namespace stats {
   extern Statistic serializerTime;
   extern Statistic addConstraintTime;
   
+  extern Statistic queryIncremental;
+
 #ifdef DEBUG
   extern Statistic arrayHashTime;
 #endif

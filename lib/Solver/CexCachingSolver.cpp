@@ -92,6 +92,14 @@ public:
   SolverRunStatus getOperationStatusCode();
   char *getConstraintLog(const Query& query);
   void setCoreSolverTimeout(double timeout);
+
+  void setIncrementalStatus(bool enable) {
+    solver->impl->setIncrementalStatus(enable);
+  }
+
+  bool getIncrementalStatus() { return solver->impl->getIncrementalStatus(); }
+
+  void clearSolverStack() { solver->impl->clearSolverStack(); }
 };
 
 ///

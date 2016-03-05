@@ -15,7 +15,6 @@
 
 // TODO clean me up
 #include "STPBuilder.h"
-#include "MetaSMTBuilder.h"
 
 #include "klee/Constraints.h"
 #include "klee/Expr.h"
@@ -45,7 +44,7 @@
 #include "llvm/Support/Path.h"
 
 #include <thread>
-#include <limits.h>
+#include <limits>
 
 using namespace klee;
 extern bool IgnoreSolverFailures;
@@ -107,6 +106,8 @@ private:
 
   Serializer serializer;
   Deserializer deserializer;
+
+  bool incremental;
 
   void startProcess() {
     // fork process here
@@ -181,6 +182,8 @@ private:
       smem_response->resetSync();
 
       startProcess();
+      // reset incremental status
+      setIncrementalStatus(incremental);
       return false;
     }
     return true;
@@ -199,10 +202,12 @@ public:
             new SharedMem(SharedMem::defaultSize, shared_mem_id + "_request")),
         smem_response(
             new SharedMem(SharedMem::defaultSize, shared_mem_id + "_response")),
-        serializer(*smem_request), deserializer(*smem_response, cache) {
+        serializer(*smem_request), deserializer(*smem_response, cache),
+        incremental(false) {
     // fork process here
     startProcess();
   }
+
   ~ClientSolverAdapterImpl() {
     if (processPid > 0) {
       smem_request->signalExit();
@@ -217,6 +222,7 @@ public:
 
     // Acquire lock on the shared memory
     SharedMem::Locker lock(*smem_request);
+
     prepareRequest(SharedMem::CONSTRAINT_LOG);
     std::vector<const Array *> no_additional_arrays;
     serializer.serializeQuery(query, no_additional_arrays);
@@ -225,7 +231,6 @@ public:
     ++stats::queryCounterexamples;
 
     auto result = requestResult();
-
     assert(result);
 
     return deserializer.deserializeConstraintLogAnswer();
@@ -283,8 +288,8 @@ public:
 
     // Request ownership of the shared memory
     SharedMem::Locker lock(*smem_request);
-    prepareRequest(SharedMem::INITIAL_VALUE);
 
+    prepareRequest(SharedMem::INITIAL_VALUE);
     serializer.serializeQuery(query, objects);
     ++stats::queries;
     ++stats::queryCounterexamples;
@@ -307,6 +312,19 @@ public:
   }
 
   SolverRunStatus getOperationStatusCode() override { return runStatusCode; }
+
+  void setIncrementalStatus(bool newValue) override {
+    incremental = newValue;
+    if (incremental)
+      smem_request->setIncrementalLevel(std::numeric_limits<uint32_t>::max());
+
+    smem_request->setIncremental(incremental);
+    smem_response->setIncremental(incremental);
+  }
+
+  bool getIncrementalStatus() override { return incremental; }
+
+  void clearSolverStack() override { smem_request->setIncrementalLevel(0); }
 };
 
 /***/

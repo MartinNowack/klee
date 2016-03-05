@@ -239,8 +239,9 @@ static bool EvaluateInputAST(const char *Filename,
       assert("FIXME: Support counterexample query commands!");
       if (QC->Values.empty() && QC->Objects.empty()) {
         bool result;
-        if (S->mustBeTrue(Query(ConstraintManager(QC->Constraints), QC->Query),
-                          result)) {
+        if (S->mustBeTrue(
+                Query(ConstraintManager(QC->Constraints), QC->Query, nullptr),
+                result)) {
           llvm::outs() << (result ? "VALID" : "INVALID");
         } else {
           llvm::outs() << "FAIL (reason: "
@@ -255,8 +256,8 @@ static bool EvaluateInputAST(const char *Filename,
         assert(QC->Query->isFalse() &&
                "FIXME: Support counterexamples with non-trivial query!");
         ref<ConstantExpr> result;
-        if (S->getValue(Query(ConstraintManager(QC->Constraints), 
-                              QC->Values[0]),
+        if (S->getValue(Query(ConstraintManager(QC->Constraints), QC->Values[0],
+                              nullptr),
                         result)) {
           llvm::outs() << "INVALID\n";
           llvm::outs() << "\tExpr 0:\t" << result;
@@ -267,10 +268,10 @@ static bool EvaluateInputAST(const char *Filename,
         }
       } else {
         std::vector< std::vector<unsigned char> > result;
-        
-        if (S->getInitialValues(Query(ConstraintManager(QC->Constraints), 
-                                      QC->Query),
-                                QC->Objects, result)) {
+
+        if (S->getInitialValues(
+                Query(ConstraintManager(QC->Constraints), QC->Query, nullptr),
+                QC->Objects, result)) {
           llvm::outs() << "INVALID\n";
 
           for (unsigned i = 0, e = result.size(); i != e; ++i) {
@@ -377,21 +378,20 @@ static bool printInputAsSMTLIBv2(const char *Filename,
 			 * will later cause a NULL pointer dereference.
 			 */
 			ConstraintManager constraintM(QC->Constraints);
-			Query query(constraintM,QC->Query);
-			printer.setQuery(query);
+                        Query query(constraintM, QC->Query, nullptr);
+                        printer.setQuery(query);
 
-			if(!QC->Objects.empty())
-				printer.setArrayValuesToGet(QC->Objects);
+                        if (!QC->Objects.empty())
+                          printer.setArrayValuesToGet(QC->Objects);
 
-			printer.generateOutput();
+                        printer.generateOutput();
 
+                        queryNumber++;
+                }
+        }
 
-			queryNumber++;
-		}
-	}
-
-	//Clean up
-	for (std::vector<Decl*>::iterator it = Decls.begin(),
+        // Clean up
+        for (std::vector<Decl*>::iterator it = Decls.begin(),
 			ie = Decls.end(); it != ie; ++it)
 		delete *it;
 	delete P;

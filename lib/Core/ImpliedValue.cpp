@@ -226,16 +226,18 @@ void ImpliedValue::checkForImpliedValues(Solver *S, ref<Expr> e,
                                                              Context::get().getPointerWidth())));
   }
 
+  assert(0 && "Query not updated yet");
   ConstraintManager assume(assumption);
   for (std::vector< ref<ReadExpr> >::iterator i = reads.begin(), 
          ie = reads.end(); i != ie; ++i) {
     ref<ReadExpr> var = *i;
     ref<ConstantExpr> possible;
-    bool success = S->getValue(Query(assume, var), possible);
+    bool success = S->getValue(Query(assume, var, nullptr), possible);
     assert(success && "FIXME: Unhandled solver failure");    
     std::map<ref<ReadExpr>, ref<ConstantExpr> >::iterator it = found.find(var);
     bool res;
-    success = S->mustBeTrue(Query(assume, EqExpr::create(var, possible)), res);
+    success = S->mustBeTrue(
+        Query(assume, EqExpr::create(var, possible), nullptr), res);
     assert(success && "FIXME: Unhandled solver failure");    
     if (res) {
       if (it != found.end()) {

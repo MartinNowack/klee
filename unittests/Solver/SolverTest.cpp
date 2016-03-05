@@ -82,7 +82,8 @@ void testOperation(Solver &solver,
     ConstraintManager constraints;
     constraints.addConstraint(expr);
     bool res;
-    bool success = solver.mustBeTrue(Query(constraints, queryExpr), res);
+    bool success =
+        solver.mustBeTrue(Query(constraints, queryExpr, nullptr), res);
     EXPECT_EQ(true, success) << "Constraint solving failed";
 
     if (success) {

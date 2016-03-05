@@ -73,7 +73,7 @@ TEST(SolverTest, SharedMemoryQuery) {
   m.addConstraint(ReadExpr::create(ul, getConstant(0, 32)));
   m.addConstraint(ReadExpr::create(ul, getConstant(1, 32)));
 
-  Query query(m, getConstant(3, 32));
+  Query query(m, getConstant(3, 32), nullptr);
 
   std::vector<const Array *> empty;
   ser.serializeQuery(query, empty);
@@ -158,7 +158,7 @@ TEST(SolverTest, Roundtrip) {
   ConstraintManager m;
   m.addConstraint(ReadExpr::create(ul, getConstant(0, 32)));
   m.addConstraint(ReadExpr::create(ul, getConstant(1, 32)));
-  Query query(m, getConstant(3, 32));
+  Query query(m, getConstant(3, 32), nullptr);
 
   Serializer ser_c(sm_client);
   std::vector<const Array *> empty;

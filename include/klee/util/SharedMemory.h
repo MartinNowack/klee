@@ -53,7 +53,7 @@ public:
 
   constexpr static size_t defaultSize = 40 * 1024 * 1024;
 
-  /// TODO move me to descending class
+  // TODO move me to descending class
   enum command {
     INITIAL_VALUE = 0,
     CONSTRAINT_LOG = 1,
@@ -63,6 +63,11 @@ public:
 
   void setCommand(command c);
   command getCommand();
+
+  void setIncremental(bool isIncremental);
+  bool getIncremental();
+  void setIncrementalLevel(uint32_t level);
+  uint32_t getIncrementalLevel();
 
   class Locker {
   public:

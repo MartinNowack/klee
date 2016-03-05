@@ -36,6 +36,7 @@
 #include "klee/util/ExprUtil.h"
 #include "klee/util/GetElementPtrTypeIterator.h"
 #include "klee/Config/Version.h"
+#include "klee/SolverImpl.h"
 #include "klee/Internal/ADT/KTest.h"
 #include "klee/Internal/ADT/RNG.h"
 #include "klee/Internal/Module/Cell.h"
@@ -328,6 +329,11 @@ namespace {
       OneForkProcess("one-fork-process",
                      llvm::cl::desc("One fork process (default=on)"),
                      llvm::cl::init(true));
+
+  // XXX Move to CoreSolver
+  cl::opt<bool> SolveIncremental("solve-incremental",
+                                 cl::desc("Solve incremental (default=on)"),
+                                 cl::init(true));
 }
 
 
@@ -372,6 +378,9 @@ Executor::Executor(const InterpreterOptions &opts, InterpreterHandler *ih)
   if (!coreSolver) {
     klee_error("Failed to create core solver\n");
   }
+
+  if (SolveIncremental)
+    coreSolver = new IncrementalSolver(coreSolver);
   Solver *solver = constructSolverChain(
       coreSolver,
       interpreterHandler->getOutputFilename(ALL_QUERIES_SMT2_FILE_NAME),
@@ -3732,7 +3741,7 @@ void Executor::getConstraintLog(const ExecutionState &state, std::string &res,
 
   switch (logFormat) {
   case STP: {
-    Query query(state.constraints, ConstantExpr::alloc(0, Expr::Bool));
+    Query query(state.constraints, ConstantExpr::alloc(0, Expr::Bool), &state);
     char *log = solver->getConstraintLog(query);
     res = std::string(log);
     free(log);
@@ -3750,7 +3759,7 @@ void Executor::getConstraintLog(const ExecutionState &state, std::string &res,
     llvm::raw_string_ostream info(Str);
     ExprSMTLIBPrinter printer;
     printer.setOutput(info);
-    Query query(state.constraints, ConstantExpr::alloc(0, Expr::Bool));
+    Query query(state.constraints, ConstantExpr::alloc(0, Expr::Bool), &state);
     printer.setQuery(query);
     printer.generateOutput();
     res = info.str();
@@ -3767,6 +3776,8 @@ bool Executor::getSymbolicSolution(const ExecutionState &state,
                                    std::vector<unsigned char> > >
                                    &res) {
   solver->setTimeout(coreSolverTimeout);
+
+  solver->solver->impl->clearSolverStack();
 
   ExecutionState tmp(state);
 
