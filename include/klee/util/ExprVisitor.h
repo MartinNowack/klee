@@ -21,7 +21,7 @@ namespace klee {
       enum Kind { SkipChildren, DoChildren, ChangeTo };
 
     private:
-      //      Action() {}
+      Action() {}
       Action(Kind _kind) 
         : kind(_kind), argument(ConstantExpr::alloc(0, Expr::Bool)) {}
       Action(Kind _kind, const ref<Expr> &_argument) 

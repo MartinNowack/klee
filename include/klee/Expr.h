@@ -434,9 +434,11 @@ public:
              const ref<Expr> &_value);
 
   unsigned getSize() const { return size; }
+  void setSize(unsigned newSize) { size = newSize; }
 
   int compare(const UpdateNode &b) const;  
   unsigned hash() const { return hashValue; }
+  void setHash(unsigned value) { hashValue = value; }
 
 private:
   UpdateNode() : refCount(0) {}

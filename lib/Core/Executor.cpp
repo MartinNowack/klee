@@ -370,7 +370,7 @@ Executor::Executor(const InterpreterOptions &opts, InterpreterHandler *ih)
       validationFile(0) {
 
   if (coreSolverTimeout) UseForkedCoreSolver = true;
-  Solver *coreSolver = klee::createCoreSolver(CoreSolverToUse);
+  Solver *coreSolver = klee::createCoreSolver(CoreSolverToUse, &arrayCache);
   if (!coreSolver) {
     klee_error("Failed to create core solver\n");
   }
