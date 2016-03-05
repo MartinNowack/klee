@@ -227,7 +227,7 @@ TestBinary(Sge) ///< Not used in canonical form
   m.addConstraint(ReadExpr::create(ul, getConstant(0, 32)));
   m.addConstraint(ReadExpr::create(ul, getConstant(1, 32)));
 
-  Query query(m, getConstant(3, 32));
+  Query query(m, getConstant(3, 32), nullptr);
 
   std::vector<const Array *> empty;
   auto s = serializeQuery(query, empty);

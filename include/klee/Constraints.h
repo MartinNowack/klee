@@ -32,6 +32,10 @@ public:
   explicit
   ConstraintManager(const std::vector< ref<Expr> > &_constraints) :
     constraints(_constraints) {}
+  // create from constraints with no optimization
+  explicit ConstraintManager(constraints_ty::const_iterator begin,
+                             constraints_ty::const_iterator end)
+      : constraints(begin, end) {}
 
   ConstraintManager(const ConstraintManager &cs) : constraints(cs.constraints) {}
 

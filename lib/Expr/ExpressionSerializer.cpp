@@ -790,7 +790,7 @@ public:
       m.addConstraint(genExpr(c));
     }
     requestedArrayIndex = qc.getRequestedArrayIndex();
-    return Query(m, genExpr(qc.getQuery()));
+    return Query(m, genExpr(qc.getQuery()), nullptr);
   }
 
   std::vector<const Array *> getArrays() {

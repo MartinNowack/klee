@@ -110,7 +110,8 @@ bool ValidatingSolver::computeInitialValues(
          it != ie; ++it)
       constraints = AndExpr::create(constraints, *it);
 
-    if (!oracle->impl->computeTruth(Query(tmp, constraints), answer))
+    if (!oracle->impl->computeTruth(Query(tmp, constraints, query.queryOrigin),
+                                    answer))
       return false;
     if (!answer)
       assert(0 && "invalid solver result (computeInitialValues)");

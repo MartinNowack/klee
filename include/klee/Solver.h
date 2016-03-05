@@ -19,24 +19,27 @@ namespace klee {
   class ConstraintManager;
   class Expr;
   class SolverImpl;
+  class ExecutionState;
 
   struct Query {
   public:
     const ConstraintManager &constraints;
     ref<Expr> expr;
+    const ExecutionState *queryOrigin;
 
-    Query(const ConstraintManager& _constraints, ref<Expr> _expr)
-      : constraints(_constraints), expr(_expr) {
-    }
+    Query(const ConstraintManager &_constraints, ref<Expr> _expr,
+          const ExecutionState *originState)
+        : constraints(_constraints), expr(_expr), queryOrigin(originState) {}
 
     /// withExpr - Return a copy of the query with the given expression.
     Query withExpr(ref<Expr> _expr) const {
-      return Query(constraints, _expr);
+      return Query(constraints, _expr, queryOrigin);
     }
 
     /// withFalse - Return a copy of the query with a false expression.
     Query withFalse() const {
-      return Query(constraints, ConstantExpr::alloc(0, Expr::Bool));
+      return Query(constraints, ConstantExpr::alloc(0, Expr::Bool),
+                   queryOrigin);
     }
 
     /// negateExpr - Return a copy of the query with the expression negated.
@@ -254,6 +257,27 @@ namespace klee {
     /// be optimized into add/shift/multiply operations.
     ClientProcessAdapterSolver(ArrayCache *cache, bool optimizeDivides = true,
                                size_t index = 0);
+
+    /// getConstraintLog - Return the constraint log for the given state in CVC
+    /// format.
+    virtual char *getConstraintLog(const Query &);
+
+    /// setCoreSolverTimeout - Set constraint solver timeout delay to the given
+    /// value; 0
+    /// is off.
+    virtual void setCoreSolverTimeout(double timeout);
+  };
+
+  /// STPSolver - A complete solver based on STP.
+  class IncrementalSolver : public Solver {
+  public:
+    /// STPSolver - Construct a new STPSolver.
+    ///
+    /// \param useForkedSTP - Whether STP should be run in a separate process
+    /// (required for using timeouts).
+    /// \param optimizeDivides - Whether constant division operations should
+    /// be optimized into add/shift/multiply operations.
+    IncrementalSolver(Solver *solver);
 
     /// getConstraintLog - Return the constraint log for the given state in CVC
     /// format.

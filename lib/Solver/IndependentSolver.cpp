@@ -406,6 +406,13 @@ public:
   SolverRunStatus getOperationStatusCode();
   char *getConstraintLog(const Query&);
   void setCoreSolverTimeout(double timeout);
+  void setIncrementalStatus(bool enable) {
+    solver->impl->setIncrementalStatus(enable);
+  }
+
+  bool getIncrementalStatus() { return solver->impl->getIncrementalStatus(); }
+
+  void clearSolverStack() { solver->impl->clearSolverStack(); }
 };
   
 bool IndependentSolver::computeValidity(const Query& query,
@@ -414,8 +421,8 @@ bool IndependentSolver::computeValidity(const Query& query,
   IndependentElementSet eltsClosure =
     getIndependentConstraints(query, required);
   ConstraintManager tmp(required);
-  return solver->impl->computeValidity(Query(tmp, query.expr), 
-                                       result);
+  return solver->impl->computeValidity(
+      Query(tmp, query.expr, query.queryOrigin), result);
 }
 
 bool IndependentSolver::computeTruth(const Query& query, bool &isValid) {
@@ -423,7 +430,7 @@ bool IndependentSolver::computeTruth(const Query& query, bool &isValid) {
   IndependentElementSet eltsClosure = 
     getIndependentConstraints(query, required);
   ConstraintManager tmp(required);
-  return solver->impl->computeTruth(Query(tmp, query.expr), 
+  return solver->impl->computeTruth(Query(tmp, query.expr, query.queryOrigin),
                                     isValid);
 }
 
@@ -432,7 +439,8 @@ bool IndependentSolver::computeValue(const Query& query, ref<Expr> &result) {
   IndependentElementSet eltsClosure = 
     getIndependentConstraints(query, required);
   ConstraintManager tmp(required);
-  return solver->impl->computeValue(Query(tmp, query.expr), result);
+  return solver->impl->computeValue(Query(tmp, query.expr, query.queryOrigin),
+                                    result);
 }
 
 // Helper function used only for assertions to make sure point created
@@ -494,8 +502,9 @@ bool IndependentSolver::computeInitialValues(const Query& query,
     }
     ConstraintManager tmp(it->exprs);
     std::vector<std::vector<unsigned char> > tempValues;
-    if (!solver->impl->computeInitialValues(Query(tmp, ConstantExpr::alloc(0, Expr::Bool)),
-                                            arraysInFactor, tempValues, hasSolution)){
+    if (!solver->impl->computeInitialValues(
+            Query(tmp, ConstantExpr::alloc(0, Expr::Bool), query.queryOrigin),
+            arraysInFactor, tempValues, hasSolution)) {
       values.clear();
       delete factors;
       return false;
