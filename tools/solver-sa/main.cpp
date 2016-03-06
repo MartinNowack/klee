@@ -43,7 +43,12 @@ int main(int argc, char **argv, char **envp) {
 
   // todo Use division argument as well
   ArrayCache cache;
-  Solver *coreSolver = new STPSolver(false, true);
+//  Solver *coreSolver = klee::createCoreSolver(CoreSolverToUse, &cache);
+
+//  Solver *coreSolver = new STPSolver(false, true);
+  Solver *coreSolver = new Z3Solver();
+//  Solver *coreSolver = new STPSolver(false, false);
+
 
   auto solver = coreSolver;
 
