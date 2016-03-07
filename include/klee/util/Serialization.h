@@ -33,15 +33,15 @@ public:
 class Serializer : public SD {
 public:
   Serializer(SharedMem &_memobj) : SD(_memobj) {}
-  void serializeExpression(const ref<Expr> &e);
+  void serializeExpression(const ref<Expr> &e, bool success);
   void serializeQuery(const Query &query,
                       const std::vector<const Array *> &arrays);
   void serializeConstraintLogAnswer(char *str);
-  void serializeComputeTruthAnswer(bool isValid);
+  void serializeComputeTruthAnswer(bool isValid, bool success);
   void serializeComputeInitialValuesAnswer(
       std::vector<std::vector<unsigned char> > &values, bool success,
       bool hasSolution, SolverImpl::SolverRunStatus runStatusCode);
-  void serializeComputeValueAnswer(const ref<Expr> &expr);
+  void serializeComputeValueAnswer(const ref<Expr> &expr, bool success);
 };
 
 class Deserializer : public SD {
@@ -51,16 +51,16 @@ private:
 public:
   Deserializer(SharedMem &_memobj, ArrayCache *_arrayCache)
       : SD(_memobj), arrayCache(_arrayCache) {}
-  ref<Expr> deserializeExpression();
+  ref<Expr> deserializeExpression(bool &success);
   Query deserializeQuery(ConstraintManager &m);
   Query deserializeQuery(ConstraintManager &m,
                          std::vector<const Array *> &arrays);
   char *deserializeConstraintLogAnswer();
-  void deserializeComputeTruthAnswer(bool &isValid);
+  void deserializeComputeTruthAnswer(bool &isValid, bool &success);
   void deserializeComputeInitialValuesAnswer(
       std::vector<std::vector<unsigned char> > &values, bool &success,
       bool &hasSolution, SolverImpl::SolverRunStatus &runStatusCode);
-  void deserializeComputeValueAnswer(ref<Expr> &expr);
+  void deserializeComputeValueAnswer(ref<Expr> &expr, bool &success);
 };
 
 kj::Array<capnp::word> serializeExpression(const ref<Expr> &e);

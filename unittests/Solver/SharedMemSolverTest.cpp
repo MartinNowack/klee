@@ -44,12 +44,16 @@ TEST(SolverTest, SharedMemoryExpression) {
   Deserializer deser1(m, &cache);
   Deserializer deser2(m2, &cache);
 
-  ser.serializeExpression(exp1);
+  bool success = true;
+  bool success2;
+  ser.serializeExpression(exp1, success);
   // Deserialize from first shared memory area
-  EXPECT_TRUE(*exp1 == *deser1.deserializeExpression());
+  EXPECT_TRUE(*exp1 == *deser1.deserializeExpression(success2));
+  EXPECT_TRUE(success2);
 
   // Deserialize from second shared memory area
-  EXPECT_TRUE(*exp1 == *deser2.deserializeExpression());
+  EXPECT_TRUE(*exp1 == *deser2.deserializeExpression(success2));
+  EXPECT_TRUE(success2);
 }
 
 TEST(SolverTest, SharedMemoryQuery) {
