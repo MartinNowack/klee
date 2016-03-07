@@ -123,7 +123,7 @@ int main(int argc, char **argv, char **envp) {
       bool isValid;
       bool success = solver->impl->computeTruth(query, isValid);
 
-      serializer.serializeComputeTruthAnswer(isValid);
+      serializer.serializeComputeTruthAnswer(isValid, success);
       break;
     }
     case SharedMem::COMPUTE_VALUE: {
@@ -135,7 +135,7 @@ int main(int argc, char **argv, char **envp) {
       ref<Expr> result;
       bool success = solver->impl->computeValue(query, result);
 
-      serializer.serializeComputeValueAnswer(result);
+      serializer.serializeComputeValueAnswer(result, success);
       break;
     }
     default:

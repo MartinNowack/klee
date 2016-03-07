@@ -137,6 +137,7 @@ struct ExpressionContainer {
     arrays @1 :List(Array);
     updates @2 :List(UpdateNodeBox);
     expressions @3: List(ExprBox);
+    success @4 : Bool;
 }
 
 # Contains whole Query
@@ -162,13 +163,16 @@ struct QueryResponse {
 
 struct ConstraintLogResponse {
   response @0 : Text;
+  success @1 : Bool;
 }
 
 struct ComputeTruthResponse {
   isValid @0 : Bool;
+  success @1 : Bool;
 }
 
 # We currently use "ExpressionContainer"
-#struct ComputeValueResponse {
+# struct ComputeValueResponse {
 #  result @0 : Expr;
+#  success @1 : Bool;
 #}

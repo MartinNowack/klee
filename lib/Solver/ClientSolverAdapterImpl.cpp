@@ -244,8 +244,9 @@ public:
     if (!requestResult())
       return false;
 
-    deserializer.deserializeComputeTruthAnswer(isValid);
-    return true;
+    bool success;
+    deserializer.deserializeComputeTruthAnswer(isValid, success);
+    return success;
   }
 
   bool computeValue(const Query &query, ref<Expr> &result) override {
@@ -264,8 +265,9 @@ public:
     if (!requestResult())
       return false;
 
-    deserializer.deserializeComputeValueAnswer(result);
-    return true;
+    bool success;
+    deserializer.deserializeComputeValueAnswer(result, success);
+    return success;
   }
 
   bool computeInitialValues(const Query &query,

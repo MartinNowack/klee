@@ -111,6 +111,8 @@ public:
     }
   }
 
+  void setSuccess(bool success) { message->getRoot<T>().setSuccess(success); }
+
 protected:
   uint32_t getUpdateIndex(const UpdateNode *node) {
     // reserve 0 for nullptr value
@@ -492,7 +494,7 @@ kj::Array<capnp::word> serializeExpression(const ref<Expr> &e) {
   return of.serialize();
 }
 
-void Serializer::serializeExpression(const ref<Expr> &e) {
+void Serializer::serializeExpression(const ref<Expr> &e, bool success) {
   memObj.clearMemory();
   ExpressionSerializer<serial::ExpressionContainer> of(memObj);
   of.visitExpr(e);
@@ -501,6 +503,7 @@ void Serializer::serializeExpression(const ref<Expr> &e) {
   // a flat buffer as it is already layed out in the memory referenced by memObj
   assert(of.workQueueEmpty() && "Work queue not empty");
   of.buildExpressions();
+  of.setSuccess(success);
 
   // Remember the space we used inside the memObj
   memObj.setUsedSize(of.getUsedSize());
@@ -570,20 +573,22 @@ void Serializer::serializeConstraintLogAnswer(char *str) {
                      sizeof(capnp::word));
 }
 
-void Serializer::serializeComputeTruthAnswer(bool isValid) {
+void Serializer::serializeComputeTruthAnswer(bool isValid, bool success) {
   memObj.clearMemory();
   capnp::MMapMessageBuilder builder(memObj.getAddr(), memObj.getSize());
   auto root = builder.initRoot<serial::ComputeTruthResponse>();
   root.setIsValid(isValid);
+  root.setSuccess(success);
 
   // Remember the space we used inside the memObj
   memObj.setUsedSize(capnp::computeSerializedSizeInWords(builder) *
                      sizeof(capnp::word));
 }
 
-void Serializer::serializeComputeValueAnswer(const ref<Expr> &expr) {
+void Serializer::serializeComputeValueAnswer(const ref<Expr> &expr,
+                                             bool success) {
   // we workaround and use serializeExpression for this response
-  serializeExpression(expr);
+  serializeExpression(expr, success);
 }
 
 ///
@@ -806,6 +811,11 @@ public:
         arrayReader(messageReader->getRoot<T>().getArrays()),
         updateNodeReader(messageReader->getRoot<T>().getUpdates()),
         requestedArrayIndex(0), arrayCache(_arrayCache) {}
+
+  bool getSuccess() {
+    auto qc = messageReader->getRoot<T>();
+    return qc.getSuccess();
+  }
 };
 
 ref<Expr> deserializeExpression(kj::Array<capnp::word> &messageBuffer,
@@ -815,12 +825,13 @@ ref<Expr> deserializeExpression(kj::Array<capnp::word> &messageBuffer,
   return ed.getExpr();
 }
 
-ref<Expr> Deserializer::deserializeExpression() {
+ref<Expr> Deserializer::deserializeExpression(bool &success) {
   kj::ArrayPtr<const capnp::word> segments[1] = {
       kj::arrayPtr<const capnp::word>(
           reinterpret_cast<const capnp::word *>(memObj.getAddr()),
           memObj.getSize())};
   ExpressionDeserializer<serial::ExpressionContainer> ed(segments, arrayCache);
+  success = ed.getSuccess();
   return ed.getExpr();
 }
 
@@ -882,7 +893,7 @@ char *Deserializer::deserializeConstraintLogAnswer() {
   auto root = reader.getRoot<serial::ConstraintLogResponse>();
   return strdup(root.getResponse().cStr());
 }
-void Deserializer::deserializeComputeTruthAnswer(bool &isValid) {
+void Deserializer::deserializeComputeTruthAnswer(bool &isValid, bool &success) {
   kj::ArrayPtr<const capnp::word> segments[1] = {
       kj::arrayPtr<const capnp::word>(
           reinterpret_cast<const capnp::word *>(memObj.getAddr()),
@@ -890,10 +901,12 @@ void Deserializer::deserializeComputeTruthAnswer(bool &isValid) {
   capnp::SegmentArrayMessageReader reader(segments, getReaderOpts());
   auto root = reader.getRoot<serial::ComputeTruthResponse>();
   isValid = root.getIsValid();
+  success = root.getSuccess();
 }
 
-void Deserializer::deserializeComputeValueAnswer(ref<Expr> &expr) {
-  expr = deserializeExpression();
+void Deserializer::deserializeComputeValueAnswer(ref<Expr> &expr,
+                                                 bool &success) {
+  expr = deserializeExpression(success);
 }
 
 } // namespace klee
