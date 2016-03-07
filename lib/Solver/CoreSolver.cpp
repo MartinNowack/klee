@@ -58,23 +58,15 @@ static klee::Solver *handleMetaSMT() {
   return coreSolver;
 }
 #endif /* ENABLE_METASMT */
-namespace {
-llvm::cl::opt<bool>
-    OneForkProcess("one-fork-process",
-                   llvm::cl::desc("One fork process (default=on)"),
-                   llvm::cl::init(true));
-}
 namespace klee {
 
 Solver *createCoreSolver(CoreSolverType cst, ArrayCache *cache) {
-  if (OneForkProcess)
-    return new ClientProcessAdapterSolver(cache, CoreSolverOptimizeDivides);
-
   switch (cst) {
   case STP_SOLVER:
 #ifdef ENABLE_STP
     llvm::errs() << "Using STP solver backend\n";
-    return new STPSolver(UseForkedCoreSolver, CoreSolverOptimizeDivides);
+    // XXX change false to appropriate parameter
+    return new STPSolver(false, CoreSolverOptimizeDivides);
 #else
     llvm::errs() << "Not compiled with STP support\n";
     return NULL;

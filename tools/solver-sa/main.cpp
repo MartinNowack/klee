@@ -39,16 +39,14 @@ using namespace klee;
 int main(int argc, char **argv, char **envp) {
 
   // setup new shared mem for queries ...
-  assert(argc == 2);
+  assert(argc == 3);
+
+  int coreSolverId = atoi(argv[2]);
+
 
   // todo Use division argument as well
   ArrayCache cache;
-//  Solver *coreSolver = klee::createCoreSolver(CoreSolverToUse, &cache);
-
-//  Solver *coreSolver = new STPSolver(false, true);
-  Solver *coreSolver = new Z3Solver();
-//  Solver *coreSolver = new STPSolver(false, false);
-
+  Solver *coreSolver = klee::createCoreSolver((CoreSolverType)coreSolverId, &cache);
 
   auto solver = coreSolver;
 
