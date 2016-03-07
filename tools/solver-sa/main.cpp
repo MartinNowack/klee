@@ -89,13 +89,13 @@ int main(int argc, char **argv, char **envp) {
       return 0;
     }
     request.unlock();
+    // Acquire query from shared memory
+    ConstraintManager cm;
+    std::vector<const Array *> arrays;
+    auto query = deserializer.deserializeQuery(cm, arrays);
 
     switch (request.getCommand()) {
     case SharedMem::INITIAL_VALUE: {
-      // Acquire query from shared memory
-      ConstraintManager cm;
-      std::vector<const Array *> arrays;
-      auto query = deserializer.deserializeQuery(cm, arrays);
       std::vector<std::vector<unsigned char> > values;
       bool hasSolution = false;
       bool success = solver->impl->computeInitialValues(query, arrays, values,
@@ -106,10 +106,6 @@ int main(int argc, char **argv, char **envp) {
       break;
     }
     case SharedMem::CONSTRAINT_LOG: {
-      // Acquire query from shared memory
-      ConstraintManager cm;
-      std::vector<const Array *> arrays;
-      auto query = deserializer.deserializeQuery(cm, arrays);
       auto res = coreSolver->getConstraintLog(query);
 
       serializer.serializeConstraintLogAnswer(res);
@@ -117,11 +113,6 @@ int main(int argc, char **argv, char **envp) {
       break;
     }
     case SharedMem::COMPUTE_TRUTH: {
-      // Acquire query from shared memory
-      ConstraintManager cm;
-      std::vector<const Array *> arrays;
-      auto query = deserializer.deserializeQuery(cm, arrays);
-
       bool isValid;
       bool success = solver->impl->computeTruth(query, isValid);
 
@@ -129,11 +120,6 @@ int main(int argc, char **argv, char **envp) {
       break;
     }
     case SharedMem::COMPUTE_VALUE: {
-      // Acquire query from shared memory
-      ConstraintManager cm;
-      std::vector<const Array *> arrays;
-      auto query = deserializer.deserializeQuery(cm, arrays);
-
       ref<Expr> result;
       bool success = solver->impl->computeValue(query, result);
 
