@@ -334,6 +334,11 @@ namespace {
   llvm::cl::opt<std::string> InstructionValidationFile(
       "instruction-validation-file",
       llvm::cl::desc("Use file to validate executed instructions against it."));
+
+  llvm::cl::opt<bool>
+      OneForkProcess("one-fork-process",
+                     llvm::cl::desc("One fork process (default=on)"),
+                     llvm::cl::init(true));
 }
 
 
@@ -370,7 +375,12 @@ Executor::Executor(const InterpreterOptions &opts, InterpreterHandler *ih)
       validationFile(0) {
 
   if (coreSolverTimeout) UseForkedCoreSolver = true;
-  Solver *coreSolver = klee::createCoreSolver(CoreSolverToUse, &arrayCache);
+  Solver *coreSolver = NULL;
+  if (OneForkProcess)
+    coreSolver =
+        new ClientProcessAdapterSolver(&arrayCache, CoreSolverOptimizeDivides);
+  else
+    coreSolver = klee::createCoreSolver(CoreSolverToUse, &arrayCache);
   if (!coreSolver) {
     klee_error("Failed to create core solver\n");
   }

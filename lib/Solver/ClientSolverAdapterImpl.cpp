@@ -121,7 +121,8 @@ private:
     }
     if (processPid == 0) {
       char *argv[] = {const_cast<char *>(solverPath.data()),
-                      const_cast<char *>(shared_mem_id.c_str()), nullptr};
+                      const_cast<char *>(shared_mem_id.c_str()),
+		      const_cast<char *>(std::to_string(CoreSolverToUse.getValue()).c_str()), nullptr};
       execvp(argv[0], &argv[0]);
       fprintf(stderr, "ERROR: Execve failed %s", strerror(errno));
       exit(1);
