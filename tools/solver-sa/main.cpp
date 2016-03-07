@@ -12,7 +12,7 @@
 #include "klee/util/ArrayCache.h"
 #include "klee/util/SharedMemory.h"
 #include "klee/util/Serialization.h"
-
+#include "llvm/Support/FileSystem.h"
 #include <limits>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -74,11 +74,13 @@ int main(int argc, char **argv, char **envp) {
       if (kill(parent_pid, 0) == -1)
         return 1;
 
-      std::ifstream ifs(FileName);
-      std::string str((std::istreambuf_iterator<char>(ifs)),
-                      std::istreambuf_iterator<char>());
-      if (str.find("zombie") != std::string::npos)
-        return 0;
+      if (llvm::sys::fs::exists(FileName)) {
+        std::ifstream ifs(FileName);
+        std::string str((std::istreambuf_iterator<char>(ifs)),
+                        std::istreambuf_iterator<char>());
+        if (str.find("zombie") != std::string::npos)
+          return 0;
+      }
 
       continue;
     }
