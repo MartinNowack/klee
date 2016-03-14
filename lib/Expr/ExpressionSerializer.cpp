@@ -46,7 +46,7 @@ template <class T> class ExpressionSerializer {
 protected:
   uint32_t getArrayIndex(const Array &ar) {
     for (size_t i = 0, j = usedArrays.size(); i != j; ++i) {
-      if (usedArrays[i] == &ar)
+      if (usedArrays[i]->size == ar.size && usedArrays[i]->name == ar.name)
         return i;
     }
     usedArrays.push_back(&ar);
@@ -164,12 +164,12 @@ protected:
 
     auto re_exp = exp.initReadExpr();
 
+    re_exp.setIndexExpr(itemStack.back());
+    itemStack.pop_back();
+
     // Set Array
     auto array_idx = getArrayIndex(*re.updates.root);
     re_exp.setArrayIndex(array_idx);
-
-    re_exp.setIndexExpr(itemStack.back());
-    itemStack.pop_back();
 
     // Iterate through all update list elements
     for (auto c = re.updates.head; c; c = c->next) {
