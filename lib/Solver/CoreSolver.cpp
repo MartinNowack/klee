@@ -9,6 +9,7 @@
 
 #include "klee/CommandLine.h"
 #include "klee/Solver.h"
+#include "klee/Internal/Support/ErrorHandling.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 #include <string>
@@ -64,29 +65,29 @@ Solver *createCoreSolver(CoreSolverType cst, ArrayCache *cache, bool forked) {
   switch (cst) {
   case STP_SOLVER:
 #ifdef ENABLE_STP
-    llvm::errs() << "Using STP solver backend\n";
+    klee_message("Using STP solver backend");
     return new STPSolver(forked && UseForkedCoreSolver,
                          CoreSolverOptimizeDivides);
 #else
-    llvm::errs() << "Not compiled with STP support\n";
+    klee_message("Not compiled with STP support\n");
     return NULL;
 #endif
   case METASMT_SOLVER:
 #ifdef ENABLE_METASMT
-    llvm::errs() << "Using MetaSMT solver backend\n";
+    klee_message("Using MetaSMT solver backend\n");
     return handleMetaSMT();
 #else
-    llvm::errs() << "Not compiled with MetaSMT support\n";
+    klee_message("Not compiled with MetaSMT support\n");
     return NULL;
 #endif
   case DUMMY_SOLVER:
     return createDummySolver();
   case Z3_SOLVER:
 #ifdef ENABLE_Z3
-    llvm::errs() << "Using Z3 solver backend\n";
+    klee_message("Using Z3 solver backend\n");
     return new Z3Solver();
 #else
-    llvm::errs() << "Not compiled with Z3 support\n";
+    klee_message("Not compiled with Z3 support\n");
     return NULL;
 #endif
   case NO_SOLVER:
