@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <iterator>
 #include <vector>
+#include <unordered_set>
 
 #include "util/Ref.h"
 
@@ -65,11 +66,14 @@ private:
 
   // Tracks origin position for each set
   std::vector<int64_t> origPosition;
+  std::unordered_set<int64_t> deletedPositions;
 
 public:
   int64_t getPositions(const_iterator it) const {
     return origPosition[it - constraints.begin()];
   }
+
+  bool isDeleted(int64_t pos) const { return deletedPositions.count(pos); }
 };
 
 /**

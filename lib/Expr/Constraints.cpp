@@ -35,6 +35,7 @@ llvm::cl::opt<bool> RewriteEqualities(
 void ConstraintSetView::swap(ConstraintSetView &other) {
   constraints.swap(other.constraints);
   origPosition.swap(other.origPosition);
+  deletedPositions.swap(other.deletedPositions);
 }
 
 void ConstraintSetView::dump() const {
@@ -146,6 +147,7 @@ void ConstraintManager::addConstraintInternal(ref<Expr> e, size_t position) {
   case Expr::Constant:
     assert(cast<ConstantExpr>(e)->isTrue() &&
            "attempt to add invalid (false) constraint");
+    constraintSetView.deletedPositions.insert(position);
     break;
 
   // split to enable finer grained independence and other optimizations

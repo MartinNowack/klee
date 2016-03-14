@@ -91,9 +91,13 @@ int main(int argc, char **argv, char **envp) {
     request.unlock();
     coreSolver->impl->setIncrementalStatus(request.getIncremental());
 
-    if (!request.getIncremental() ||
-        request.getIncrementalLevel() < std::numeric_limits<uint32_t>::max())
+    if (!request.getIncremental()) {
       coreSolver->impl->clearSolverStack();
+    } else if (request.getIncrementalLevel() <
+               std::numeric_limits<uint32_t>::max()) {
+      coreSolver->impl->clearSolverStack();
+      request.setIncrementalLevel(std::numeric_limits<uint32_t>::max());
+    }
 
     // Acquire query from shared memory
     ConstraintSetView cm;
