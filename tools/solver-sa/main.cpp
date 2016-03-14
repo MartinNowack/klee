@@ -46,7 +46,8 @@ int main(int argc, char **argv, char **envp) {
 
   // todo Use division argument as well
   ArrayCache cache;
-  Solver *coreSolver = klee::createCoreSolver((CoreSolverType)coreSolverId, &cache);
+  Solver *coreSolver = klee::createCoreSolver((CoreSolverType)coreSolverId,
+                                              &cache, /* forked solver*/ false);
 
   auto solver = coreSolver;
 
