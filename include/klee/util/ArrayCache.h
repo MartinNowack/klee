@@ -68,6 +68,7 @@ public:
                            Expr::Width _range = Expr::Int8, uint64_t uid = 0);
   uint64_t getArrayUID(const Array*) const;
   const Array *getArray(uint64_t uid) const;
+  void clear();
 
 private:
   typedef unordered_set<const Array *, klee::ArrayHashFn,
