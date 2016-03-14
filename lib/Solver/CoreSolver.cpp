@@ -60,13 +60,13 @@ static klee::Solver *handleMetaSMT() {
 #endif /* ENABLE_METASMT */
 namespace klee {
 
-Solver *createCoreSolver(CoreSolverType cst, ArrayCache *cache) {
+Solver *createCoreSolver(CoreSolverType cst, ArrayCache *cache, bool forked) {
   switch (cst) {
   case STP_SOLVER:
 #ifdef ENABLE_STP
     llvm::errs() << "Using STP solver backend\n";
-    // XXX change false to appropriate parameter
-    return new STPSolver(false, CoreSolverOptimizeDivides);
+    return new STPSolver(forked && UseForkedCoreSolver,
+                         CoreSolverOptimizeDivides);
 #else
     llvm::errs() << "Not compiled with STP support\n";
     return NULL;

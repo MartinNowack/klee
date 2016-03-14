@@ -333,7 +333,8 @@ namespace klee {
   Solver *createDummySolver();
 
   // Create a solver based on the supplied ``CoreSolverType``.
-  Solver *createCoreSolver(CoreSolverType cst, ArrayCache *cache);
+  Solver *createCoreSolver(CoreSolverType cst, ArrayCache *cache,
+                           bool forked = true);
 }
 
 #endif
