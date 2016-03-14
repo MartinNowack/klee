@@ -1,12 +1,16 @@
 /*
  * IncrementalSolver.cpp
  *
- * Solver allows incremental solving of equations
+ * Solver allows incremental solving of equations.
+ *
+ * The general assumption is that constraints are ordered the way the are added.
+ * And they keep this order.
  */
 
 #include "klee/Solver.h"
 #include "klee/SolverImpl.h"
 #include "klee/SolverStats.h"
+#include "klee/ExecutionState.h"
 #include "klee/Expr.h"
 #include "klee/Constraints.h"
 
@@ -19,10 +23,9 @@ private:
   std::unique_ptr<Solver> solver;
 
   const ExecutionState *oldState;
-  std::vector<ref<Expr> > usedConstraints;
-  std::vector<size_t> usedConstraintsStack;
+  std::set<int64_t> usedConstraints;
 
-  ConstraintManager activeConstraints;
+  ConstraintSetView activeConstraints;
 
 public:
   IncrementalSolverImpl(Solver *_solver) : solver(_solver), oldState(nullptr) {
@@ -49,44 +52,60 @@ public:
   }
 
   void clearSolverStack() override {
+    clearSolverStackAndState();
+  }
+
+  void clearSolverStackAndState(const ExecutionState * newState = nullptr) {
     usedConstraints.clear();
-    usedConstraintsStack.clear();
 
     // force clearing of solver stack
     solver->impl->clearSolverStack();
-    oldState = nullptr;
+    oldState = newState;
   }
-
 protected:
   Query getPartialQuery(const Query &q);
 };
 
 Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
-  // In case we change the state, we clear our saved state
+  bool clearedStack = false;
+
+  // In case we changed to a new state, we clear our saved state
   if (q.queryOrigin != oldState) {
-    oldState = q.queryOrigin;
-    clearSolverStack();
+    clearedStack = true;
+  } else {
+    // Check if used constraints were deleted
+    for (auto pos : usedConstraints)
+      if (q.constraints.isDeleted(pos)) {
+        clearedStack = true;
+        break;
+      }
   }
 
-  // Push new constraints
-  auto oldIndex = usedConstraints.size();
-  for (const auto e : q.constraints) {
-    if (std::find(usedConstraints.begin(), usedConstraints.end(), &*e) ==
-        usedConstraints.end())
-      usedConstraints.push_back(&*e);
-  }
-  auto newIndex = usedConstraints.size();
+  if (clearedStack)
+    clearSolverStackAndState(q.queryOrigin);
 
-  // Check if new constraints were added
-  if (oldIndex != newIndex) {
-    activeConstraints = ConstraintManager(usedConstraints.begin() + oldIndex,
-                                          usedConstraints.begin() + newIndex);
-    usedConstraintsStack.push_back(newIndex);
+  SimpleConstraintManager cm(activeConstraints);
+  cm.clear();
+
+  for (ConstraintSetView::const_iterator it = q.constraints.begin(),
+                                         itE = q.constraints.end();
+       it != itE; ++it) {
+    auto position = q.constraints.getPositions(it);
+    // Skip if we already used that constraint
+    if (usedConstraints.count(position))
+      continue;
+
+    if (position >= 0)
+      usedConstraints.insert(position);
+    cm.push_back(*it);
+  }
+
+  if (!clearedStack) {
     ++stats::queryIncremental;
-    return Query(activeConstraints, q.expr, q.queryOrigin);
   }
-  activeConstraints = ConstraintManager();
-  return Query(activeConstraints, q.expr, q.queryOrigin);
+
+  auto res = Query(activeConstraints, q.expr, q.queryOrigin);
+  return res;
 }
 
 ///
