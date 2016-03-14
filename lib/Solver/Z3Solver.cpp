@@ -181,7 +181,7 @@ bool Z3SolverImpl::internalRunSolver(
 
   runStatusCode = SOLVER_RUN_STATUS_FAILURE;
 
-  for (ConstraintManager::const_iterator it = query.constraints.begin(),
+  for (ConstraintSetView::const_iterator it = query.constraints.begin(),
                                          ie = query.constraints.end();
        it != ie; ++it) {
     Z3_solver_assert(builder->ctx, theSolver, builder->construct(*it));

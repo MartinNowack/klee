@@ -223,18 +223,21 @@ TestBinary(Sge) ///< Not used in canonical form
   auto ar = cache.CreateArray("foo", 32);
   auto ul = UpdateList(ar, nullptr);
 
-  ConstraintManager m;
+  ConstraintSetView view;
+  ConstraintManager m(view);
   m.addConstraint(ReadExpr::create(ul, getConstant(0, 32)));
   m.addConstraint(ReadExpr::create(ul, getConstant(1, 32)));
 
-  Query query(m, getConstant(3, 32), nullptr);
+  Query query(view, getConstant(3, 32), nullptr);
 
   std::vector<const Array *> empty;
   auto s = serializeQuery(query, empty);
 
-  ConstraintManager m2;
-  auto query2 = deserializeQuery(s, m2, &cache);
+  ConstraintSetView view2;
+  ConstraintManager m2(view);
+  auto query2 = deserializeQuery(s, view2, &cache);
 
+  EXPECT_TRUE(view == view2);
   EXPECT_TRUE(m == m2);
   EXPECT_TRUE(*query.expr == *query2.expr);
 }

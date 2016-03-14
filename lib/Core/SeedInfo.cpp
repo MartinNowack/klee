@@ -60,10 +60,11 @@ KTestObject *SeedInfo::getNextInput(const MemoryObject *mo,
 void SeedInfo::patchSeed(const ExecutionState &state, 
                          ref<Expr> condition,
                          TimingSolver *solver) {
+  ConstraintSetView tmp;
+  ReferencingConstraintManager rcm(tmp, state.constraints);
   std::vector< ref<Expr> > required(state.constraints.begin(),
                                     state.constraints.end());
-  ExecutionState tmp(required);
-  tmp.addConstraint(condition);
+  rcm.addConstraint(condition);
 
   // Try and patch direct reads first, this is likely to resolve the
   // problem quickly and avoids long traversal of all seed
@@ -105,11 +106,10 @@ void SeedInfo::patchSeed(const ExecutionState &state,
         assert(success && "FIXME: Unhandled solver failure");            
         (void) success;
         it2->second[i] = value->getZExtValue(8);
-        tmp.addConstraint(EqExpr::create(read, 
-                                         ConstantExpr::alloc(it2->second[i], 
-                                                             Expr::Int8)));
+        rcm.addConstraint(EqExpr::create(
+            read, ConstantExpr::alloc(it2->second[i], Expr::Int8)));
       } else {
-        tmp.addConstraint(isSeed);
+        rcm.addConstraint(isSeed);
       }
     }
   }
@@ -143,11 +143,10 @@ void SeedInfo::patchSeed(const ExecutionState &state,
         assert(success && "FIXME: Unhandled solver failure");            
         (void) success;
         it->second[i] = value->getZExtValue(8);
-        tmp.addConstraint(EqExpr::create(read, 
-                                         ConstantExpr::alloc(it->second[i], 
-                                                             Expr::Int8)));
+        rcm.addConstraint(EqExpr::create(
+            read, ConstantExpr::alloc(it->second[i], Expr::Int8)));
       } else {
-        tmp.addConstraint(isSeed);
+        rcm.addConstraint(isSeed);
       }
     }
   }

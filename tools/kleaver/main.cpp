@@ -240,7 +240,7 @@ static bool EvaluateInputAST(const char *Filename,
       if (QC->Values.empty() && QC->Objects.empty()) {
         bool result;
         if (S->mustBeTrue(
-                Query(ConstraintManager(QC->Constraints), QC->Query, nullptr),
+                Query(ConstraintSetView(QC->Constraints), QC->Query, nullptr),
                 result)) {
           llvm::outs() << (result ? "VALID" : "INVALID");
         } else {
@@ -256,7 +256,7 @@ static bool EvaluateInputAST(const char *Filename,
         assert(QC->Query->isFalse() &&
                "FIXME: Support counterexamples with non-trivial query!");
         ref<ConstantExpr> result;
-        if (S->getValue(Query(ConstraintManager(QC->Constraints), QC->Values[0],
+        if (S->getValue(Query(ConstraintSetView(QC->Constraints), QC->Values[0],
                               nullptr),
                         result)) {
           llvm::outs() << "INVALID\n";
@@ -270,7 +270,7 @@ static bool EvaluateInputAST(const char *Filename,
         std::vector< std::vector<unsigned char> > result;
 
         if (S->getInitialValues(
-                Query(ConstraintManager(QC->Constraints), QC->Query, nullptr),
+                Query(ConstraintSetView(QC->Constraints), QC->Query, nullptr),
                 QC->Objects, result)) {
           llvm::outs() << "INVALID\n";
 
@@ -377,7 +377,8 @@ static bool printInputAsSMTLIBv2(const char *Filename,
 			 * constraint in the constraint set is set to NULL and
 			 * will later cause a NULL pointer dereference.
 			 */
-			ConstraintManager constraintM(QC->Constraints);
+                        /// XXX Fixme
+                        ConstraintSetView constraintM(QC->Constraints);
                         Query query(constraintM, QC->Query, nullptr);
                         printer.setQuery(query);
 

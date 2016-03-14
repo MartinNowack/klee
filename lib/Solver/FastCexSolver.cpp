@@ -999,8 +999,9 @@ FastCexSolver::~FastCexSolver() { }
 /// \return - True if the propogation was able to prove validity or invalidity.
 static bool propogateValues(const Query& query, CexData &cd, 
                             bool checkExpr, bool &isValid) {
-  for (ConstraintManager::const_iterator it = query.constraints.begin(), 
-         ie = query.constraints.end(); it != ie; ++it) {
+  for (ConstraintSetView::const_iterator it = query.constraints.begin(),
+                                         ie = query.constraints.end();
+       it != ie; ++it) {
     cd.propogatePossibleValue(*it, 1);
     cd.propogateExactValue(*it, 1);
   }
@@ -1024,8 +1025,9 @@ static bool propogateValues(const Query& query, CexData &cd,
     }
   }
 
-  for (ConstraintManager::const_iterator it = query.constraints.begin(), 
-         ie = query.constraints.end(); it != ie; ++it) {
+  for (ConstraintSetView::const_iterator it = query.constraints.begin(),
+                                         ie = query.constraints.end();
+       it != ie; ++it) {
     if (hasSatisfyingAssignment && !cd.evaluatePossible(*it)->isTrue())
       hasSatisfyingAssignment = false;
 
