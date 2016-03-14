@@ -781,13 +781,14 @@ public:
     return genExpr(ec.getExprIdx());
   }
 
-  Query getQuery(ConstraintManager &m) {
+  Query getQuery(ConstraintSetView &m) {
     auto qc = messageReader->getRoot<T>();
     initializeArrays();
     initializeExpressions();
+    SimpleConstraintManager sm(m);
 
     for (auto c : qc.getConstraints()) {
-      m.addConstraint(genExpr(c));
+      sm.addConstraint(genExpr(c));
     }
     requestedArrayIndex = qc.getRequestedArrayIndex();
     return Query(m, genExpr(qc.getQuery()), nullptr);
@@ -840,12 +841,12 @@ ref<Expr> Deserializer::deserializeExpression(bool &success) {
 }
 
 Query deserializeQuery(kj::Array<capnp::word> &messageBuffer,
-                       ConstraintManager &m, ArrayCache *arrayCache) {
+                       ConstraintSetView &m, ArrayCache *arrayCache) {
   ExpressionDeserializer<serial::QueryContainer> ed(messageBuffer, arrayCache);
   return ed.getQuery(m);
 }
 
-Query Deserializer::deserializeQuery(ConstraintManager &m) {
+Query Deserializer::deserializeQuery(ConstraintSetView &m) {
   kj::ArrayPtr<const capnp::word> segments[1] = {
       kj::arrayPtr<const capnp::word>(
           reinterpret_cast<const capnp::word *>(memObj.getAddr()),
@@ -854,7 +855,7 @@ Query Deserializer::deserializeQuery(ConstraintManager &m) {
   return ed.getQuery(m);
 }
 
-Query Deserializer::deserializeQuery(ConstraintManager &m,
+Query Deserializer::deserializeQuery(ConstraintSetView &m,
                                      std::vector<const Array *> &arrays) {
   kj::ArrayPtr<const capnp::word> segments[1] = {
       kj::arrayPtr<const capnp::word>(

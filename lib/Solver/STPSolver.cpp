@@ -403,7 +403,7 @@ bool STPSolverImpl::computePartialInitialValues(
   if (incremental && !emptyConstraints) {
     vc_push(vc);
 
-    for (ConstraintManager::const_iterator it = sorted_constraints.begin(),
+    for (ConstraintSetView::const_iterator it = sorted_constraints.begin(),
                                            ie = sorted_constraints.end();
          it != ie; ++it) {
       vc_assertFormula(vc, builder->construct(*it));
@@ -417,7 +417,7 @@ bool STPSolverImpl::computePartialInitialValues(
 
   vc_push(vc);
   if (!incremental) {
-    for (ConstraintManager::const_iterator it = sorted_constraints.begin(),
+    for (ConstraintSetView::const_iterator it = sorted_constraints.begin(),
                                            ie = sorted_constraints.end();
          it != ie; ++it) {
       vc_assertFormula(vc, builder->construct(*it));

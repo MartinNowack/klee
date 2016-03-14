@@ -16,7 +16,7 @@ namespace llvm {
   class raw_ostream;
 }
 namespace klee {
-  class ConstraintManager;
+class ConstraintSetView;
 
   class ExprPPrinter {
   protected:
@@ -61,15 +61,15 @@ namespace klee {
     static void printSingleExpr(llvm::raw_ostream &os, const ref<Expr> &e);
 
     static void printConstraints(llvm::raw_ostream &os,
-                                 const ConstraintManager &constraints);
+                                 const ConstraintSetView &constraints);
 
     static void printQuery(llvm::raw_ostream &os,
-                           const ConstraintManager &constraints,
+                           const ConstraintSetView &constraints,
                            const ref<Expr> &q,
                            const ref<Expr> *evalExprsBegin = 0,
                            const ref<Expr> *evalExprsEnd = 0,
-                           const Array * const* evalArraysBegin = 0,
-                           const Array * const* evalArraysEnd = 0,
+                           const Array *const *evalArraysBegin = 0,
+                           const Array *const *evalArraysEnd = 0,
                            bool printArrayDecls = true);
   };
 

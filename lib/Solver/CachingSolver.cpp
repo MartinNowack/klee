@@ -40,13 +40,13 @@ private:
                    IncompleteSolver::PartialValidity &result);
   
   struct CacheEntry {
-    CacheEntry(const ConstraintManager &c, ref<Expr> q)
-      : constraints(c), query(q) {}
+    CacheEntry(const ConstraintSetView &c, ref<Expr> q)
+        : constraints(c), query(q) {}
 
     CacheEntry(const CacheEntry &ce)
       : constraints(ce.constraints), query(ce.query) {}
-    
-    ConstraintManager constraints;
+
+    ConstraintSetView constraints;
     ref<Expr> query;
 
     bool operator==(const CacheEntry &b) const {
@@ -57,8 +57,8 @@ private:
   struct CacheEntryHash {
     unsigned operator()(const CacheEntry &ce) const {
       unsigned result = ce.query->hash();
-      
-      for (ConstraintManager::constraint_iterator it = ce.constraints.begin();
+
+      for (ConstraintSetView::constraint_iterator it = ce.constraints.begin();
            it != ce.constraints.end(); ++it)
         result ^= (*it)->hash();
       

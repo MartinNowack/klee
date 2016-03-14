@@ -209,7 +209,8 @@ void ImpliedValue::checkForImpliedValues(Solver *S, ref<Expr> e,
   std::set< ref<ReadExpr> > readsSet(reads.begin(), reads.end());
   reads = std::vector< ref<ReadExpr> >(readsSet.begin(), readsSet.end());
 
-  std::vector<ref<Expr> > assumption;
+  ConstraintSetView assume;
+  SimpleConstraintManager assumption(assume);
   assumption.push_back(EqExpr::create(e, value));
 
   // obscure... we need to make sure that all the read indices are
@@ -227,7 +228,6 @@ void ImpliedValue::checkForImpliedValues(Solver *S, ref<Expr> e,
   }
 
   assert(0 && "Query not updated yet");
-  ConstraintManager assume(assumption);
   for (std::vector< ref<ReadExpr> >::iterator i = reads.begin(), 
          ie = reads.end(); i != ie; ++i) {
     ref<ReadExpr> var = *i;

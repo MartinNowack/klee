@@ -87,10 +87,10 @@ bool SMTParser::Solve() {
     assert("FIXME: Support counterexample query commands!");
     if (QC->Values.empty() && QC->Objects.empty()) {
       bool result;
-      if (S->mustBeTrue(Query(ConstraintManager(QC->Constraints), QC->Query),
-			result)) {
-	//std::cout << (result ? "VALID" : "INVALID") << "\n";
-	return result;	
+      if (S->mustBeTrue(Query(ConstraintSetView(QC->Constraints), QC->Query),
+                        result)) {
+        // std::cout << (result ? "VALID" : "INVALID") << "\n";
+        return result;
       }
     }
   }

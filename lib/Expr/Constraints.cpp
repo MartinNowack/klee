@@ -26,12 +26,25 @@
 using namespace klee;
 
 namespace {
-  llvm::cl::opt<bool>
-  RewriteEqualities("rewrite-equalities",
-		    llvm::cl::init(true),
-		    llvm::cl::desc("Rewrite existing constraints when an equality with a constant is added (default=on)"));
+llvm::cl::opt<bool> RewriteEqualities(
+    "rewrite-equalities", llvm::cl::init(true),
+    llvm::cl::desc("Rewrite existing constraints when an equality with a "
+                   "constant is added (default=on)"));
 }
 
+void ConstraintSetView::swap(ConstraintSetView &other) {
+  constraints.swap(other.constraints);
+  origPosition.swap(other.origPosition);
+}
+
+void ConstraintSetView::dump() const {
+  size_t i = 0;
+  for (const_iterator it = constraints.begin(), itE = constraints.end();
+       it != itE; ++it) {
+    llvm::errs() << "{" << origPosition[i++] << "}";
+    (*it)->dump();
+  }
+}
 
 class ExprReplaceVisitor : public ExprVisitor {
 private:
@@ -59,17 +72,16 @@ public:
 
 class ExprReplaceVisitor2 : public ExprVisitor {
 private:
-  const std::map< ref<Expr>, ref<Expr> > &replacements;
+  const std::map<ref<Expr>, ref<Expr> > &replacements;
 
 public:
-  ExprReplaceVisitor2(const std::map< ref<Expr>, ref<Expr> > &_replacements) 
-    : ExprVisitor(true),
-      replacements(_replacements) {}
+  ExprReplaceVisitor2(const std::map<ref<Expr>, ref<Expr> > &_replacements)
+      : ExprVisitor(true), replacements(_replacements) {}
 
   Action visitExprPost(const Expr &e) {
-    std::map< ref<Expr>, ref<Expr> >::const_iterator it =
-      replacements.find(ref<Expr>(const_cast<Expr*>(&e)));
-    if (it!=replacements.end()) {
+    std::map<ref<Expr>, ref<Expr> >::const_iterator it =
+        replacements.find(ref<Expr>(const_cast<Expr *>(&e)));
+    if (it != replacements.end()) {
       return Action::changeTo(it->second);
     } else {
       return Action::doChildren();
@@ -78,69 +90,69 @@ public:
 };
 
 bool ConstraintManager::rewriteConstraints(ExprVisitor &visitor) {
-  ConstraintManager::constraints_ty old;
+  ConstraintSetView old;
   bool changed = false;
 
-  constraints.swap(old);
-  for (ConstraintManager::constraints_ty::iterator 
-         it = old.begin(), ie = old.end(); it != ie; ++it) {
+  constraintSetView.swap(old);
+  for (ConstraintSetView::iterator it = old.constraints.begin(),
+                                   ie = old.constraints.end();
+       it != ie; ++it) {
     ref<Expr> &ce = *it;
     ref<Expr> e = visitor.visit(ce);
 
-    if (e!=ce) {
-      addConstraintInternal(e); // enable further reductions
+    size_t positions = old.getPositions(it);
+
+    if (e != ce) {
+      addConstraintInternal(e, positions); // enable further reductions
       changed = true;
     } else {
-      constraints.push_back(ce);
+      constraintSetView.push_back(ce, positions);
     }
   }
 
   return changed;
 }
 
-void ConstraintManager::simplifyForValidConstraint(ref<Expr> e) {
-  // XXX 
-}
-
-ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
+ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e,
+                                          const ConstraintSetView &view) {
   if (isa<ConstantExpr>(e))
     return e;
 
-  std::map< ref<Expr>, ref<Expr> > equalities;
-  
-  for (ConstraintManager::constraints_ty::const_iterator 
-         it = constraints.begin(), ie = constraints.end(); it != ie; ++it) {
-    if (const EqExpr *ee = dyn_cast<EqExpr>(*it)) {
+  std::map<ref<Expr>, ref<Expr> > equalities;
+
+  for (ConstraintSetView::constraints_ty::const_iterator
+           it = view.constraints.begin(),
+           ie = view.constraints.end();
+       it != ie; ++it) {
+    if (const EqExpr *ee = dyn_cast<EqExpr>(*it))
       if (isa<ConstantExpr>(ee->left)) {
-        equalities.insert(std::make_pair(ee->right,
-                                         ee->left));
-      } else {
-        equalities.insert(std::make_pair(*it,
-                                         ConstantExpr::alloc(1, Expr::Bool)));
-      }
-    } else {
-      equalities.insert(std::make_pair(*it,
-                                       ConstantExpr::alloc(1, Expr::Bool)));
+        equalities.insert(std::make_pair(ee->right, ee->left));
+        continue;
     }
+    equalities.insert(std::make_pair(*it, ConstantExpr::alloc(1, Expr::Bool)));
   }
 
   return ExprReplaceVisitor2(equalities).visit(e);
 }
 
-void ConstraintManager::addConstraintInternal(ref<Expr> e) {
+ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) {
+  return ConstraintManager::simplifyExpr(e, constraintSetView);
+}
+
+void ConstraintManager::addConstraintInternal(ref<Expr> e, size_t position) {
   // rewrite any known equalities and split Ands into different conjuncts
 
   switch (e->getKind()) {
   case Expr::Constant:
-    assert(cast<ConstantExpr>(e)->isTrue() && 
+    assert(cast<ConstantExpr>(e)->isTrue() &&
            "attempt to add invalid (false) constraint");
     break;
-    
-    // split to enable finer grained independence and other optimizations
+
+  // split to enable finer grained independence and other optimizations
   case Expr::And: {
     BinaryExpr *be = cast<BinaryExpr>(e);
-    addConstraintInternal(be->left);
-    addConstraintInternal(be->right);
+    addConstraintInternal(be->left, position);
+    addConstraintInternal(be->right, position);
     break;
   }
 
@@ -153,16 +165,16 @@ void ConstraintManager::addConstraintInternal(ref<Expr> e) {
       // (byte-constant comparison).
       BinaryExpr *be = cast<BinaryExpr>(e);
       if (isa<ConstantExpr>(be->left)) {
-	ExprReplaceVisitor visitor(be->right, be->left);
-	rewriteConstraints(visitor);
+        ExprReplaceVisitor visitor(be->right, be->left);
+        rewriteConstraints(visitor);
       }
     }
-    constraints.push_back(e);
+    constraintSetView.push_back(e, position);
     break;
   }
-    
+
   default:
-    constraints.push_back(e);
+    constraintSetView.push_back(e, position);
     break;
   }
 }
@@ -171,5 +183,6 @@ void ConstraintManager::addConstraint(ref<Expr> e) {
   TimerStatIncrementer t(stats::addConstraintTime);
 
   e = simplifyExpr(e);
-  addConstraintInternal(e);
+  auto next_position = constraintSetView.next_free_position++;
+  addConstraintInternal(e, next_position);
 }
