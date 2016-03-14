@@ -2,18 +2,23 @@
 
 namespace klee {
 
+void ArrayCache::clear() {
+  // Free Allocated Array objects
+  for (ArrayHashMap::iterator ai = cachedSymbolicArrays.begin(), e =
+      cachedSymbolicArrays.end(); ai != e; ++ai) {
+    delete *ai;
+  }
+  for (ArrayPtrVec::iterator ai = concreteArrays.begin(), e =
+      concreteArrays.end(); ai != e; ++ai) {
+    delete *ai;
+  }
+  cachedSymbolicArrays.clear();
+  concreteArrays.clear();
+}
+
 ArrayCache::~ArrayCache() {
   // Free Allocated Array objects
-  for (ArrayHashMap::iterator ai = cachedSymbolicArrays.begin(),
-                              e = cachedSymbolicArrays.end();
-       ai != e; ++ai) {
-    delete *ai;
-  }
-  for (ArrayPtrVec::iterator ai = concreteArrays.begin(),
-                             e = concreteArrays.end();
-       ai != e; ++ai) {
-    delete *ai;
-  }
+  clear();
 }
 
 uint64_t ArrayCache::getArrayUID(const Array *ar) const {
