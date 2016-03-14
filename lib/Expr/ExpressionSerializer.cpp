@@ -731,7 +731,7 @@ template <class T> class ExpressionDeserializer {
       }
       arrays.push_back(arrayCache->CreateArray(array.getName(), array.getSize(),
                                                &ce[0], &ce[0] + ce.size(),
-                                               array.getDomain()));
+                                               array.getDomain(), array.getRange()));
     }
   }
 
