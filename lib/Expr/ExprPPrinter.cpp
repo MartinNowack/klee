@@ -453,7 +453,7 @@ void ExprPPrinter::printSingleExpr(llvm::raw_ostream &os, const ref<Expr> &e) {
 }
 
 void ExprPPrinter::printConstraints(llvm::raw_ostream &os,
-                                    const ConstraintManager &constraints) {
+                                    const ConstraintSetView &constraints) {
   printQuery(os, constraints, ConstantExpr::alloc(false, Expr::Bool));
 }
 
@@ -466,18 +466,16 @@ struct ArrayPtrsByName {
 };
 }
 
-void ExprPPrinter::printQuery(llvm::raw_ostream &os,
-                              const ConstraintManager &constraints,
-                              const ref<Expr> &q,
-                              const ref<Expr> *evalExprsBegin,
-                              const ref<Expr> *evalExprsEnd,
-                              const Array * const *evalArraysBegin,
-                              const Array * const *evalArraysEnd,
-                              bool printArrayDecls) {
+void ExprPPrinter::printQuery(
+    llvm::raw_ostream &os, const ConstraintSetView &constraints,
+    const ref<Expr> &q, const ref<Expr> *evalExprsBegin,
+    const ref<Expr> *evalExprsEnd, const Array *const *evalArraysBegin,
+    const Array *const *evalArraysEnd, bool printArrayDecls) {
   PPrinter p(os);
-  
-  for (ConstraintManager::const_iterator it = constraints.begin(),
-         ie = constraints.end(); it != ie; ++it)
+
+  for (ConstraintSetView::const_iterator it = constraints.begin(),
+                                         ie = constraints.end();
+       it != ie; ++it)
     p.scan(*it);
   p.scan(q);
 
@@ -518,8 +516,9 @@ void ExprPPrinter::printQuery(llvm::raw_ostream &os,
   
   // Ident at constraint list;
   unsigned indent = PC.pos;
-  for (ConstraintManager::const_iterator it = constraints.begin(),
-         ie = constraints.end(); it != ie;) {
+  for (ConstraintSetView::const_iterator it = constraints.begin(),
+                                         ie = constraints.end();
+       it != ie;) {
     p.print(*it, PC);
     ++it;
     if (it != ie)

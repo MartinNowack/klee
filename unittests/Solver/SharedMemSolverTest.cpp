@@ -69,19 +69,20 @@ TEST(SolverTest, SharedMemoryQuery) {
   auto ar = cache.CreateArray("foo", 32);
   auto ul = UpdateList(ar, nullptr);
 
-  ConstraintManager m;
+  ConstraintSetView view;
+  ConstraintManager m(view);
   m.addConstraint(ReadExpr::create(ul, getConstant(0, 32)));
   m.addConstraint(ReadExpr::create(ul, getConstant(1, 32)));
 
-  Query query(m, getConstant(3, 32), nullptr);
+  Query query(view, getConstant(3, 32), nullptr);
 
   std::vector<const Array *> empty;
   ser.serializeQuery(query, empty);
 
-  ConstraintManager m2;
-  auto query2 = deser.deserializeQuery(m2);
+  ConstraintSetView view2;
+  auto query2 = deser.deserializeQuery(view2);
 
-  EXPECT_TRUE(m == m2);
+  EXPECT_TRUE(view == view2);
   EXPECT_TRUE(*query.expr == *query2.expr);
 }
 
@@ -155,20 +156,22 @@ TEST(SolverTest, Roundtrip) {
   auto ar = cache.CreateArray("foo", 32);
   auto ul = UpdateList(ar, nullptr);
 
-  ConstraintManager m;
+  ConstraintSetView view;
+  ConstraintManager m(view);
   m.addConstraint(ReadExpr::create(ul, getConstant(0, 32)));
   m.addConstraint(ReadExpr::create(ul, getConstant(1, 32)));
-  Query query(m, getConstant(3, 32), nullptr);
+  Query query(view, getConstant(3, 32), nullptr);
 
   Serializer ser_c(sm_client);
   std::vector<const Array *> empty;
   ser_c.serializeQuery(query, empty);
 
   Deserializer deser_s(sm_server, &cache);
-  ConstraintManager m2;
-  auto query2 = deser_s.deserializeQuery(m2);
 
-  EXPECT_TRUE(m == m2);
+  ConstraintSetView view2;
+  auto query2 = deser_s.deserializeQuery(view2);
+
+  EXPECT_TRUE(view == view2);
   EXPECT_TRUE(*query.expr == *query2.expr);
 
   // Mimic an answer, written back from the server

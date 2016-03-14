@@ -87,7 +87,7 @@ ExecutionState::ExecutionState(KFunction *kf) :
   pushFrame(0, kf);
 }
 
-ExecutionState::ExecutionState(const std::vector<ref<Expr> > &assumptions)
+ExecutionState::ExecutionState(const ConstraintSetView &assumptions)
     : constraints(assumptions), queryCost(0.), ptreeNode(0) {
   uid = generateStateUid();
 }
@@ -179,6 +179,10 @@ void ExecutionState::addFnAlias(std::string old_fn, std::string new_fn) {
 
 void ExecutionState::removeFnAlias(std::string fn) {
   fnAliases.erase(fn);
+}
+
+void ExecutionState::addConstraint(ref<Expr> e) {
+  SimpleConstraintManager(constraints).addConstraint(e);
 }
 
 /**/
@@ -348,11 +352,12 @@ bool ExecutionState::merge(const ExecutionState &b) {
     }
   }
 
-  constraints = ConstraintManager();
+  constraints = ConstraintSetView();
+  SimpleConstraintManager cm(constraints);
   for (std::set< ref<Expr> >::iterator it = commonConstraints.begin(), 
          ie = commonConstraints.end(); it != ie; ++it)
-    constraints.addConstraint(*it);
-  constraints.addConstraint(OrExpr::create(inA, inB));
+    cm.addConstraint(*it);
+  cm.addConstraint(OrExpr::create(inA, inB));
 
   return true;
 }

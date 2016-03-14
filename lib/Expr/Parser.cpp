@@ -568,7 +568,8 @@ DeclResult ParserImpl::ParseCommandDecl() {
 /// 
 /// 'query' expressions-list expression [expressions-list [array-list]]
 DeclResult ParserImpl::ParseQueryCommand() {
-  std::vector<ExprHandle> Constraints;
+  ConstraintSetView Constraints;
+  SimpleConstraintManager scm(Constraints);
   std::vector<ExprHandle> Values;
   std::vector<const Array*> Objects;
   ExprResult Res;
@@ -604,7 +605,7 @@ DeclResult ParserImpl::ParseQueryCommand() {
 
     ExprResult Constraint = ParseExpr(TypeResult(Expr::Bool));
     if (Constraint.isValid())
-      Constraints.push_back(Constraint.get());
+      scm.push_back(Constraint.get());
   }
   ConsumeRSquare();
 
@@ -1631,9 +1632,10 @@ void QueryCommand::dump() {
     ObjectsBegin = &Objects[0];
     ObjectsEnd = ObjectsBegin + Objects.size();
   }
-  ExprPPrinter::printQuery(llvm::outs(), ConstraintManager(Constraints),
-                           Query, ValuesBegin, ValuesEnd,
-                           ObjectsBegin, ObjectsEnd,
+  ConstraintSetView view;
+  SimpleConstraintManager m(view);
+  ExprPPrinter::printQuery(llvm::outs(), ConstraintSetView(Constraints), Query,
+                           ValuesBegin, ValuesEnd, ObjectsBegin, ObjectsEnd,
                            false);
 }
 

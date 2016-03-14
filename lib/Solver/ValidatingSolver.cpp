@@ -91,7 +91,8 @@ bool ValidatingSolver::computeInitialValues(
   if (hasSolution) {
     // Assert the bindings as constraints, and verify that the
     // conjunction of the actual constraints is satisfiable.
-    std::vector<ref<Expr> > bindings;
+    ConstraintSetView tmp;
+    SimpleConstraintManager bindings(tmp);
     for (unsigned i = 0; i != values.size(); ++i) {
       const Array *array = objects[i];
       assert(array);
@@ -103,9 +104,8 @@ bool ValidatingSolver::computeInitialValues(
             ConstantExpr::alloc(value, array->getRange())));
       }
     }
-    ConstraintManager tmp(bindings);
     ref<Expr> constraints = Expr::createIsZero(query.expr);
-    for (ConstraintManager::const_iterator it = query.constraints.begin(),
+    for (ConstraintSetView::const_iterator it = query.constraints.begin(),
                                            ie = query.constraints.end();
          it != ie; ++it)
       constraints = AndExpr::create(constraints, *it);

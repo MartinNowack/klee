@@ -11,6 +11,7 @@
 #define KLEE_EXPR_PARSER_H
 
 #include "klee/Expr.h"
+#include "klee/Constraints.h"
 
 #include <vector>
 #include <string>
@@ -169,8 +170,8 @@ namespace expr {
 
     /// Constraints - The list of constraints to assume for this
     /// expression.
-    const std::vector<ExprHandle> Constraints;
-    
+    const ConstraintSetView Constraints;
+
     /// Query - The expression being queried.
     ExprHandle Query;
 
@@ -183,16 +184,11 @@ namespace expr {
     const std::vector<const Array*> Objects;
 
   public:
-    QueryCommand(const std::vector<ExprHandle> &_Constraints,
-                 ExprHandle _Query,
+    QueryCommand(const ConstraintSetView &_Constraints, ExprHandle _Query,
                  const std::vector<ExprHandle> &_Values,
-                 const std::vector<const Array*> &_Objects
-                 )
-      : CommandDecl(QueryCommandDeclKind),
-        Constraints(_Constraints),
-        Query(_Query),
-        Values(_Values),
-        Objects(_Objects) {}
+                 const std::vector<const Array *> &_Objects)
+        : CommandDecl(QueryCommandDeclKind), Constraints(_Constraints),
+          Query(_Query), Values(_Values), Objects(_Objects) {}
 
     virtual void dump();
 

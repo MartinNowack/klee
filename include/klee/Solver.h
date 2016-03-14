@@ -16,18 +16,18 @@
 #include <vector>
 
 namespace klee {
-  class ConstraintManager;
+class ConstraintSetView;
   class Expr;
   class SolverImpl;
   class ExecutionState;
 
   struct Query {
   public:
-    const ConstraintManager &constraints;
+    const ConstraintSetView &constraints;
     ref<Expr> expr;
     const ExecutionState *queryOrigin;
 
-    Query(const ConstraintManager &_constraints, ref<Expr> _expr,
+    Query(const ConstraintSetView &_constraints, ref<Expr> _expr,
           const ExecutionState *originState)
         : constraints(_constraints), expr(_expr), queryOrigin(originState) {}
 

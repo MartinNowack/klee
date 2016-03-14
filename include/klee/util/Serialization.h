@@ -52,8 +52,8 @@ public:
   Deserializer(SharedMem &_memobj, ArrayCache *_arrayCache)
       : SD(_memobj), arrayCache(_arrayCache) {}
   ref<Expr> deserializeExpression(bool &success);
-  Query deserializeQuery(ConstraintManager &m);
-  Query deserializeQuery(ConstraintManager &m,
+  Query deserializeQuery(ConstraintSetView &m);
+  Query deserializeQuery(ConstraintSetView &m,
                          std::vector<const Array *> &arrays);
   char *deserializeConstraintLogAnswer();
   void deserializeComputeTruthAnswer(bool &isValid, bool &success);
@@ -75,7 +75,7 @@ kj::Array<capnp::word> serializeQuery(const Query &query,
 /// from inside
 /// a state
 Query deserializeQuery(kj::Array<capnp::word> &messageBuffer,
-                       ConstraintManager &m, ArrayCache *arrayCache);
+                       ConstraintSetView &m, ArrayCache *arrayCache);
 }
 
 #endif

@@ -96,7 +96,7 @@ int main(int argc, char **argv, char **envp) {
       coreSolver->impl->clearSolverStack();
 
     // Acquire query from shared memory
-    ConstraintManager cm;
+    ConstraintSetView cm;
     std::vector<const Array *> arrays;
     auto query = deserializer.deserializeQuery(cm, arrays);
 

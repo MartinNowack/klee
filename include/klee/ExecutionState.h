@@ -95,7 +95,7 @@ public:
   AddressSpace addressSpace;
 
   /// @brief Constraints collected so far
-  ConstraintManager constraints;
+  ConstraintSetView constraints;
 
   /// Statistics and information
 
@@ -150,14 +150,14 @@ public:
   void removeFnAlias(std::string fn);
 
 private:
-  ExecutionState() : ptreeNode(0) {}
+  ExecutionState() = delete;
 
 public:
   ExecutionState(KFunction *kf);
 
   // XXX total hack, just used to make a state so solver can
   // use on structure
-  ExecutionState(const std::vector<ref<Expr> > &assumptions);
+  ExecutionState(const ConstraintSetView &assumptions);
 
   ExecutionState(const ExecutionState &state);
 
@@ -169,7 +169,7 @@ public:
   void popFrame();
 
   void addSymbolic(const MemoryObject *mo, const Array *array);
-  void addConstraint(ref<Expr> e) { constraints.addConstraint(e); }
+  void addConstraint(ref<Expr> e);
 
   bool merge(const ExecutionState &b);
   void dumpStack(llvm::raw_ostream &out) const;
