@@ -118,6 +118,12 @@ void SharedMem::initMemory() {
   }
 }
 
+void SharedMem::resetSync() {
+  for (auto &citem : ((Sync *)(addr))->syncs) {
+    citem.condition = false;
+  }
+}
+
 void *SharedMem::getAddr() {
   assert(addr);
   auto newAddr = (char *)addr + sizeof(Sync) + sizeof(uint64_t);
@@ -159,18 +165,18 @@ void SharedMem::wait(size_t id) {
 bool SharedMem::waitTimeout(size_t id, uint64_t duration) {
   struct timespec now;
   assert(addr);
-  int res = 0;
 
   if (!((Sync *)addr)->syncs[id].condition) {
     clock_gettime(CLOCK_REALTIME, &now);
     now.tv_sec += duration;
 
-    while (!((Sync *)addr)->syncs[id].condition && res != ETIMEDOUT) {
+    int res = 0;
+    while (!((Sync *)addr)->syncs[id].condition && res == 0) {
       res = pthread_cond_timedwait(
           &((Sync *)addr)->syncs[id].cv,
           &((Sync *)addr)->syncs[SharedMem::PRODUCER].mutex, &now);
-      assert(!res || res == ETIMEDOUT);
     }
+    assert(((Sync *)addr)->syncs[id].condition || res == ETIMEDOUT);
 
     if (res == ETIMEDOUT)
       return false;

@@ -45,6 +45,10 @@ public:
   /// Initializes used memory with zero
   void clearMemory();
 
+  /// Reset synchronization variables of SharedMem
+  /// Attention, the reset happens unprotected
+  void resetSync();
+
   enum role { PRODUCER = 0, CONSUMER = 1 };
 
   constexpr static size_t defaultSize = 40 * 1024 * 1024;
