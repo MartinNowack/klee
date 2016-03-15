@@ -108,10 +108,8 @@ private:
   Serializer serializer;
   Deserializer deserializer;
 
-  void killAndRestartProcess() {
+  void startProcess() {
     // fork process here
-    killProcess();
-
     auto solverPath = findSolverExecutable();
     processPid = fork();
     if (processPid == -1) {
@@ -171,14 +169,18 @@ private:
         if (!IgnoreSolverFailures)
           exit(1);
       }
+      killProcess();
 
-      killAndRestartProcess();
       // reset memory
       // TODO currently we are too conservative here and reset everything
       // hopefully timeout/crash doesn't happen too often
       memset(smem_request->getAddr(), 0, smem_request->getSize());
       memset(smem_response->getAddr(), 0, smem_response->getSize());
 
+      smem_request->resetSync();
+      smem_response->resetSync();
+
+      startProcess();
       return false;
     }
     return true;
@@ -197,7 +199,7 @@ public:
             new SharedMem(SharedMem::defaultSize, shared_mem_id + "_response")),
         serializer(*smem_request), deserializer(*smem_response, cache) {
     // fork process here
-    killAndRestartProcess();
+    startProcess();
   }
   ~ClientSolverAdapterImpl() {
     if (processPid > 0) {
