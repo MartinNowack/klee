@@ -630,11 +630,9 @@ template <class T> class ExpressionDeserializer {
       auto ul = UpdateList(arrays[e.getArrayIndex()], un);
       ul.hash();
 
-      res = ReadExpr::alloc(ul, ConstantExpr::create(4, 8));
+      res = ReadExpr::alloc(ul, genExpr(e.getIndexExpr()));
       expressions.insert(std::make_pair(idx, res));
 
-      dyn_cast<ReadExpr>(res)->index = genExpr(e.getIndexExpr());
-      dyn_cast<ReadExpr>(res)->computeHash();
       return res;
       break;
     }
