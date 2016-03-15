@@ -398,13 +398,13 @@ Z3ASTHandle Z3Builder::getArrayForUpdate(const Array *root,
   } else {
     // FIXME: This really needs to be non-recursive.
     Z3ASTHandle un_expr;
-    bool hashed = _arr_hash.lookupUpdateNodeExpr(un, un_expr);
+    bool hashed = _arr_hash.lookupUpdateNodeExpr(un, root, un_expr);
 
     if (!hashed) {
       un_expr = writeExpr(getArrayForUpdate(root, un->next),
                           construct(un->index, 0), construct(un->value, 0));
 
-      _arr_hash.hashUpdateNodeExpr(un, un_expr);
+      _arr_hash.hashUpdateNodeExpr(un, root, un_expr);
     }
 
     return (un_expr);
