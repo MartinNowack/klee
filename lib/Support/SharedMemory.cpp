@@ -120,6 +120,12 @@ void SharedMem::initMemory() {
 
 void SharedMem::resetSync() {
   for (auto &citem : ((Sync *)(addr))->syncs) {
+    pthread_cond_destroy(&citem.cv);
+    pthread_mutex_destroy(&citem.mutex);
+    auto res = pthread_mutex_init(&citem.mutex, &attrmutex);
+    assert(res == 0 && "Pthread_mutex_init failed");
+    res = pthread_cond_init(&citem.cv, &attrcond);
+    assert(res == 0 && "Pthread_cond_init failed");
     citem.condition = false;
   }
 }
