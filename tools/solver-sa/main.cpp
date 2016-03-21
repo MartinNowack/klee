@@ -79,7 +79,7 @@ int main(int argc, char **argv, char **envp) {
         if (str.find("zombie") != std::string::npos)
           return 0;
       }
-
+      request.unlock();
       continue;
     }
     if (request.exit()) {
