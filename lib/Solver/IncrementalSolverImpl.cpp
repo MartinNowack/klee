@@ -70,7 +70,7 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
   bool clearedStack = false;
 
   // In case we changed to a new state, we clear our saved state
-  if (q.queryOrigin != oldState) {
+  if (q.queryOrigin != oldState || (q.constraints.empty() && !usedConstraints.empty())) {
     clearedStack = true;
   } else {
     // Check if used constraints were deleted
