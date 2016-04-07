@@ -87,19 +87,22 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
   SimpleConstraintManager cm(activeConstraints);
   cm.clear();
 
+  std::set<int64_t> newlyAddedConstraints;
   for (ConstraintSetView::const_iterator it = q.constraints.begin(),
                                          itE = q.constraints.end();
        it != itE; ++it) {
     auto position = q.constraints.getPositions(it);
-    // Skip if we already used that constraint
+    // Skip if we already used constraints from that position
     if (usedConstraints.count(position))
       continue;
 
     if (position >= 0)
-      usedConstraints.insert(position);
+      newlyAddedConstraints.insert(position);
+
     cm.push_back(*it);
   }
 
+  usedConstraints.insert(newlyAddedConstraints.begin(), newlyAddedConstraints.end());
   if (!clearedStack) {
     ++stats::queryIncremental;
   }
