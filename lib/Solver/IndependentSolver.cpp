@@ -457,7 +457,6 @@ bool assertCreatedPointEvaluatesToTrue(const Query &query,
   for (ConstraintSetView::constraint_iterator it = query.constraints.begin();
        it != query.constraints.end(); ++it) {
     ref<Expr> ret = assign.evaluate(*it);
-
     assert(isa<ConstantExpr>(ret) && "assignment evaluation did not result in constant");
     ref<ConstantExpr> evaluatedConstraint = dyn_cast<ConstantExpr>(ret);
     if(evaluatedConstraint->isFalse()){
@@ -467,6 +466,10 @@ bool assertCreatedPointEvaluatesToTrue(const Query &query,
   ref<Expr> neg = Expr::createIsZero(query.expr);
   ref<Expr> q = assign.evaluate(neg);
   assert(isa<ConstantExpr>(q) && "assignment evaluation did not result in constant");
+  if (!cast<ConstantExpr>(q)->isTrue()) {
+    llvm::errs() << "Query: \n";
+    q->dump();
+  }
   return cast<ConstantExpr>(q)->isTrue();
 }
 

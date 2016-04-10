@@ -23,7 +23,7 @@ private:
   std::unique_ptr<Solver> solver;
 
   const ExecutionState *oldState;
-  std::set<int64_t> usedConstraints;
+  std::unordered_set<ConstraintPosition> usedConstraints;
 
   ConstraintSetView activeConstraints;
 
@@ -70,7 +70,7 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
   bool clearedStack = false;
 
   // In case we changed to a new state, we clear our saved state
-  if (q.queryOrigin != oldState || (q.constraints.empty() && !usedConstraints.empty())) {
+  if (q.queryOrigin != oldState /* || (q.constraints.empty() && !usedConstraints.empty())*/) {
     clearedStack = true;
   } else {
     // Check if used constraints were deleted
@@ -83,20 +83,23 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
 
   if (clearedStack)
     clearSolverStackAndState(q.queryOrigin);
+//  q.constraints.dump();
 
   SimpleConstraintManager cm(activeConstraints);
   cm.clear();
 
-  std::set<int64_t> newlyAddedConstraints;
+  std::unordered_set<ConstraintPosition> newlyAddedConstraints;
   for (ConstraintSetView::const_iterator it = q.constraints.begin(),
                                          itE = q.constraints.end();
        it != itE; ++it) {
     auto position = q.constraints.getPositions(it);
+//    llvm::errs() << "Position: " << position << "\n";
+//    (*it)->dump();
     // Skip if we already used constraints from that position
     if (usedConstraints.count(position))
       continue;
 
-    if (position >= 0)
+    if (position.origin >= 0)
       newlyAddedConstraints.insert(position);
 
     cm.push_back(*it);
@@ -108,6 +111,8 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
   }
 
   auto res = Query(activeConstraints, q.expr, q.queryOrigin);
+//  llvm::errs() << "New query:\n";
+//  res.dump();
   return res;
 }
 
