@@ -32,10 +32,10 @@ llvm::cl::opt<bool> RewriteEqualities(
                    "constant is added (default=on)"));
 }
 
-void ConstraintSetView::swap(ConstraintSetView &other) {
+void ConstraintSetView::extractAndResetConstraints(ConstraintSetView &other) {
   constraints.swap(other.constraints);
   origPosition.swap(other.origPosition);
-  deletedPositions.swap(other.deletedPositions);
+//  deletedPositions.swap(other.deletedPositions);
 }
 
 void ConstraintSetView::dump() const {
@@ -94,7 +94,7 @@ bool ConstraintManager::rewriteConstraints(ExprVisitor &visitor) {
   ConstraintSetView old;
   bool changed = false;
 
-  constraintSetView.swap(old);
+  constraintSetView.extractAndResetConstraints(old);
   for (ConstraintSetView::iterator it = old.constraints.begin(),
                                    ie = old.constraints.end();
        it != ie; ++it) {

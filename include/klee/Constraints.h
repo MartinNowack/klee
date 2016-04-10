@@ -60,7 +60,10 @@ private:
     origPosition.push_back(positions);
   }
 
-  void swap(ConstraintSetView &other);
+  /**
+   * Moves constraints to other but keeps state.
+   */
+  void extractAndResetConstraints(ConstraintSetView &other);
   constraints_ty constraints;
   int64_t next_free_position;
 
