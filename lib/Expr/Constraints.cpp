@@ -36,13 +36,16 @@ void ConstraintSetView::extractAndResetConstraints(ConstraintSetView &other) {
   constraints.swap(other.constraints);
   origPosition.swap(other.origPosition);
 //  deletedPositions.swap(other.deletedPositions);
+//  std::swap(uid_cntr, other.uid_cntr);
+//  std::swap(next_free_position, other.next_free_position);
 }
 
 void ConstraintSetView::dump() const {
   size_t i = 0;
   for (const_iterator it = constraints.begin(), itE = constraints.end();
        it != itE; ++it) {
-    llvm::errs() << "{" << origPosition[i++] << "}";
+    llvm::errs() << "{" << origPosition[i].origin << "/"<< origPosition[i].unique << "}";
+    ++i;
     (*it)->dump();
   }
 }
@@ -101,10 +104,10 @@ bool ConstraintManager::rewriteConstraints(ExprVisitor &visitor) {
     ref<Expr> &ce = *it;
     ref<Expr> e = visitor.visit(ce);
 
-    size_t positions = old.getPositions(it);
+    auto positions = old.getPositions(it);
 
     if (e != ce) {
-      addConstraintInternal(e, positions); // enable further reductions
+      addConstraintInternal(e, ConstraintPosition(positions.origin, constraintSetView.uid_cntr++)); // enable further reductions
       changed = true;
     } else {
       constraintSetView.push_back(ce, positions);
@@ -140,7 +143,7 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) {
   return ConstraintManager::simplifyExpr(e, constraintSetView);
 }
 
-void ConstraintManager::addConstraintInternal(ref<Expr> e, size_t position) {
+void ConstraintManager::addConstraintInternal(ref<Expr> e, ConstraintPosition position) {
   // rewrite any known equalities and split Ands into different conjuncts
 
   switch (e->getKind()) {
@@ -153,8 +156,8 @@ void ConstraintManager::addConstraintInternal(ref<Expr> e, size_t position) {
   // split to enable finer grained independence and other optimizations
   case Expr::And: {
     BinaryExpr *be = cast<BinaryExpr>(e);
-    addConstraintInternal(be->left, position);
-    addConstraintInternal(be->right, position);
+    addConstraintInternal(be->left, ConstraintPosition(position.origin, constraintSetView.uid_cntr++));
+    addConstraintInternal(be->right, ConstraintPosition(position.origin, constraintSetView.uid_cntr++));
     break;
   }
 
@@ -185,6 +188,8 @@ void ConstraintManager::addConstraint(ref<Expr> e) {
   TimerStatIncrementer t(stats::addConstraintTime);
 
   e = simplifyExpr(e);
-  auto next_position = constraintSetView.next_free_position++;
-  addConstraintInternal(e, next_position);
+  addConstraintInternal(e,
+      ConstraintPosition(
+          constraintSetView.next_free_position++,
+          constraintSetView.uid_cntr++));
 }

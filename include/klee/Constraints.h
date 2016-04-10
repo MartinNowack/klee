@@ -23,10 +23,32 @@ namespace klee {
 
 class ExprVisitor;
 class ConstraintManager;
+class ConstraintSetView;
 class SimpleConstraintManager;
 class ReferencingConstraintManager;
 class Expr;
 
+
+struct ConstraintPosition {
+  int64_t origin;
+  uint64_t unique;
+  ConstraintPosition(int64_t origin_, uint64_t unique_):
+    origin(origin_), unique(unique_){}
+  bool operator==(const ConstraintPosition &pos) const {
+    return (origin == pos.origin && unique == pos.unique);
+  }
+};
+}
+namespace std {
+template <>
+struct hash<klee::ConstraintPosition> {
+  size_t operator() (const klee::ConstraintPosition &pos) const {
+    return hash<int64_t>()(pos.origin);
+  }
+};
+}
+
+namespace klee {
 /**
  * @brief Container to keep all constraints
  */
@@ -47,7 +69,7 @@ public:
   constraint_iterator end() const { return constraints.end(); }
   size_t size() const { return constraints.size(); }
 
-  ConstraintSetView() : next_free_position(0) {}
+  ConstraintSetView() : next_free_position(0), uid_cntr(0) {}
 
   bool operator==(const ConstraintSetView &other) const {
     return constraints == other.constraints;
@@ -55,7 +77,7 @@ public:
   void dump() const;
 
 private:
-  void push_back(ref<Expr> e, size_t positions) {
+  void push_back(ref<Expr> e, ConstraintPosition positions) {
     constraints.push_back(e);
     origPosition.push_back(positions);
   }
@@ -66,17 +88,20 @@ private:
   void extractAndResetConstraints(ConstraintSetView &other);
   constraints_ty constraints;
   int64_t next_free_position;
+  uint64_t uid_cntr;
+
 
   // Tracks origin position for each set
-  std::vector<int64_t> origPosition;
-  std::unordered_set<int64_t> deletedPositions;
+  // First: the origin position, second unique id
+  std::vector<ConstraintPosition> origPosition;
+  std::unordered_set<ConstraintPosition> deletedPositions;
 
 public:
-  int64_t getPositions(const_iterator it) const {
+  ConstraintPosition getPositions(const_iterator it) const {
     return origPosition[it - constraints.begin()];
   }
 
-  bool isDeleted(int64_t pos) const { return deletedPositions.count(pos); }
+  bool isDeleted(const ConstraintPosition &pos) const { return deletedPositions.count(pos); }
 };
 
 /**
@@ -107,7 +132,7 @@ protected:
   // returns true iff the constraints were modified
   bool rewriteConstraints(ExprVisitor &visitor);
 
-  void addConstraintInternal(ref<Expr> e, size_t position);
+  void addConstraintInternal(ref<Expr> e, ConstraintPosition position);
 };
 
 /**
@@ -118,7 +143,9 @@ public:
   SimpleConstraintManager(ConstraintSetView &view) : ConstraintManager(view) {}
   // Add Constaint without simplification
   void push_back(ref<Expr> expr) {
-    constraintSetView.push_back(expr, constraintSetView.next_free_position++);
+    constraintSetView.push_back(expr,
+        ConstraintPosition(constraintSetView.next_free_position++,
+            constraintSetView.uid_cntr++));
   }
 
   SimpleConstraintManager(const SimpleConstraintManager &) = delete;
@@ -141,7 +168,7 @@ public:
   void push_back(ref<Expr> expr) {
     auto it = std::find(oldView.begin(), oldView.end(), expr);
     if (it == oldView.end())
-      constraintSetView.push_back(expr, /* unknown */ -1);
+      constraintSetView.push_back(expr, ConstraintPosition(/* unknown */ -1, /* unknown */ 0));
     else
       constraintSetView.push_back(expr, oldView.getPositions(it));
   }
