@@ -467,6 +467,10 @@ bool assertCreatedPointEvaluatesToTrue(const Query &query,
   ref<Expr> neg = Expr::createIsZero(query.expr);
   ref<Expr> q = assign.evaluate(neg, false);
   assert(isa<ConstantExpr>(q) && "assignment evaluation did not result in constant");
+  if (!cast<ConstantExpr>(q)->isTrue()) {
+    llvm::errs() << "Query: \n";
+    q->dump();
+  }
   return cast<ConstantExpr>(q)->isTrue();
 }
 
