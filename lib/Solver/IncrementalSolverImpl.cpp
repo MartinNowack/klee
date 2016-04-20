@@ -81,8 +81,12 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
       }
   }
 
-  if (clearedStack)
+  if (clearedStack) {
     clearSolverStackAndState(q.queryOrigin);
+    q.incremental_flag = false;
+  } else {
+    q.incremental_flag = true;
+  }
 //  q.constraints.dump();
 
   SimpleConstraintManager cm(activeConstraints);
@@ -96,8 +100,10 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
 //    llvm::errs() << "Position: " << position << "\n";
 //    (*it)->dump();
     // Skip if we already used constraints from that position
-    if (usedConstraints.count(position))
+    if (usedConstraints.count(position)) {
+      ++q.reused_cntr;
       continue;
+    }
 
     if (position.origin >= 0)
       newlyAddedConstraints.insert(position);
@@ -105,6 +111,7 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
     cm.push_back(*it);
   }
 
+  q.query_size = usedConstraints.size();
   usedConstraints.insert(newlyAddedConstraints.begin(), newlyAddedConstraints.end());
   if (!clearedStack) {
     ++stats::queryIncremental;
