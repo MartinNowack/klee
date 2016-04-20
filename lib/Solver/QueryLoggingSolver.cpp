@@ -92,7 +92,7 @@ void QueryLoggingSolver::startQuery(const Query &query, const char *typeName,
   startTime = getWallTime();
 }
 
-void QueryLoggingSolver::finishQuery(bool success) {
+void QueryLoggingSolver::finishQuery(bool success, const Query & query) {
   lastQueryTime = getWallTime() - startTime;
   logBuffer << queryCommentSign << "   " << (success ? "OK" : "FAIL") << " -- "
             << "Elapsed: " << lastQueryTime << "\n";
@@ -102,6 +102,10 @@ void QueryLoggingSolver::finishQuery(bool success) {
               << SolverImpl::getOperationStatusString(
                      solver->impl->getOperationStatusCode()) << "\n";
   }
+
+  logBuffer << queryCommentSign << "   Incremental: " << (query.incremental_flag) << "\n";
+  logBuffer << queryCommentSign << "   Reuse: " << (query.reused_cntr) << "\n";
+  logBuffer << queryCommentSign << "   Constraints: " << query.query_size << "\n";
 }
 
 void QueryLoggingSolver::flushBuffer() {
@@ -129,7 +133,7 @@ bool QueryLoggingSolver::computeTruth(const Query &query, bool &isValid) {
 
   bool success = solver->impl->computeTruth(query, isValid);
 
-  finishQuery(success);
+  finishQuery(success, query);
 
   if (success) {
     logBuffer << queryCommentSign
@@ -148,7 +152,7 @@ bool QueryLoggingSolver::computeValidity(const Query &query,
 
   bool success = solver->impl->computeValidity(query, result);
 
-  finishQuery(success);
+  finishQuery(success, query);
 
   if (success) {
     logBuffer << queryCommentSign << "   Validity: " << result << "\n";
@@ -166,7 +170,7 @@ bool QueryLoggingSolver::computeValue(const Query &query, ref<Expr> &result) {
 
   bool success = solver->impl->computeValue(query, result);
 
-  finishQuery(success);
+  finishQuery(success, query);
 
   if (success) {
     logBuffer << queryCommentSign << "   Result: " << result << "\n";
@@ -186,7 +190,7 @@ bool QueryLoggingSolver::computeInitialValues(
   bool success =
       solver->impl->computeInitialValues(query, objects, values, hasSolution);
 
-  finishQuery(success);
+  finishQuery(success, query);
 
   if (success) {
     logBuffer << queryCommentSign

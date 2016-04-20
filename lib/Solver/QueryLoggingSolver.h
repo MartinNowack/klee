@@ -45,7 +45,7 @@ protected:
                           const Query *falseQuery = 0,
                           const std::vector<const Array *> *objects = 0);
 
-  virtual void finishQuery(bool success);
+  virtual void finishQuery(bool success, const Query & query);
 
   /// flushBuffer - flushes the temporary logs buffer. Depending on threshold
   /// settings, contents of the buffer are either discarded or written to a
