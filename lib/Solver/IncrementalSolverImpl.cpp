@@ -127,13 +127,13 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
     cm.push_back(*it);
   }
 
-  q.reused_cntr += reused_cntr;
-
   if (!reused_cntr && usedConstraints.size()) {
     use_index = 1;
+    q.incremental_flag = false;
     return q;
   }
 
+  q.reused_cntr += reused_cntr;
   q.query_size = usedConstraints.size();
   usedConstraints.insert(newlyAddedConstraints.begin(), newlyAddedConstraints.end());
   if (!clearedStack) {
