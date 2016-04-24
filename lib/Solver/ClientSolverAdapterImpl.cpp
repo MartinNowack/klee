@@ -183,12 +183,14 @@ private:
   }
 
 public:
-  ClientSolverAdapterImpl(ArrayCache *cache, bool _optimizeDivides = true)
+  ClientSolverAdapterImpl(ArrayCache *cache, bool _optimizeDivides,
+                          size_t index)
       : timeout(0), runStatusCode(SolverRunStatus::SOLVER_RUN_STATUS_FAILURE),
         processPid(-1),
         shared_mem_id("klee_" + std::to_string(getpid()) + "_" +
                       std::to_string(std::hash<std::thread::id>()(
-                          std::this_thread::get_id()))),
+                          std::this_thread::get_id())) +
+                      "_" + std::to_string(index)),
         smem_request(
             new SharedMem(SharedMem::defaultSize, shared_mem_id + "_request")),
         smem_response(
@@ -327,8 +329,9 @@ public:
 /***/
 
 ClientProcessAdapterSolver::ClientProcessAdapterSolver(ArrayCache *cache,
-                                                       bool optimizeDivides)
-    : Solver(new ClientSolverAdapterImpl(cache, optimizeDivides)) {}
+                                                       bool optimizeDivides,
+                                                       size_t index)
+    : Solver(new ClientSolverAdapterImpl(cache, optimizeDivides, index)) {}
 
 char *ClientProcessAdapterSolver::getConstraintLog(const Query &query) {
   return impl->getConstraintLog(query);

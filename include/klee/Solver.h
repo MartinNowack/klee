@@ -252,7 +252,8 @@ namespace klee {
     /// (required for using timeouts).
     /// \param optimizeDivides - Whether constant division operations should
     /// be optimized into add/shift/multiply operations.
-    ClientProcessAdapterSolver(ArrayCache *cache, bool optimizeDivides = true);
+    ClientProcessAdapterSolver(ArrayCache *cache, bool optimizeDivides = true,
+                               size_t index = 0);
 
     /// getConstraintLog - Return the constraint log for the given state in CVC
     /// format.
