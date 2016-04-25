@@ -106,6 +106,9 @@ void QueryLoggingSolver::finishQuery(bool success, const Query & query) {
   logBuffer << queryCommentSign << "   Incremental: " << (query.incremental_flag) << "\n";
   logBuffer << queryCommentSign << "   Reuse: " << (query.reused_cntr) << "\n";
   logBuffer << queryCommentSign << "   Constraints: " << query.query_size << "\n";
+  logBuffer << queryCommentSign
+            << "   AddedConstraints: " << query.added_constraints << "\n";
+  logBuffer << queryCommentSign << "   SolverId: " << query.solver_id << "\n";
 }
 
 void QueryLoggingSolver::flushBuffer() {

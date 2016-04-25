@@ -18,23 +18,55 @@
 
 namespace klee {
 
+struct SolvingState {
+  ClientProcessAdapterSolver *solver;
+  const ExecutionState *oldState;
+  uint64_t state_uid;
+
+  std::unordered_set<ConstraintPosition> usedConstraints;
+  size_t inactive;
+  size_t solver_id;
+  SolvingState(Solver *solver_)
+      : solver(static_cast<ClientProcessAdapterSolver *>(solver_)),
+        oldState(nullptr), state_uid(0), inactive(0), solver_id(0) {}
+};
+
 class IncrementalSolverImpl : public SolverImpl {
 private:
-  std::unique_ptr<Solver> solver;
-  ClientProcessAdapterSolver simpleAdapter;
+  std::vector<SolvingState> active_incremental_solvers;
+  std::vector<std::unique_ptr<ClientProcessAdapterSolver> > solvers;
 
-  size_t use_index;
+  const size_t max_solvers;
+  size_t active_solvers;
 
-  const ExecutionState *oldState;
-  std::unordered_set<ConstraintPosition> usedConstraints;
+  // Index of solver from active_incremental_solvers to use
+  SolvingState *activeSolver;
 
+  // Used for any query during solving
   ConstraintSetView activeConstraints;
-
 public:
-  IncrementalSolverImpl(Solver *_solver)
-      : solver(_solver), simpleAdapter(nullptr, true, 1), use_index(0),
-        oldState(nullptr) {
-    solver->impl->setIncrementalStatus(true);
+  IncrementalSolverImpl(Solver *solver)
+      : max_solvers(10), active_solvers(1), activeSolver(nullptr) {
+    // Add basic core solver
+    SolvingState state(solver);
+    active_incremental_solvers.push_back(state);
+    std::unique_ptr<ClientProcessAdapterSolver> ptr(
+        static_cast<ClientProcessAdapterSolver *>(solver));
+    solvers.push_back(std::move(ptr));
+    // the base solver should not be incremental
+    solver->impl->setIncrementalStatus(false);
+    activeSolver = &active_incremental_solvers[0];
+
+    // Create and add additional solvers
+    for (size_t i = 1; i < max_solvers; ++i) {
+      std::unique_ptr<ClientProcessAdapterSolver> ptr(
+          new ClientProcessAdapterSolver(nullptr, true, i));
+      SolvingState s(ptr.get());
+      s.solver->impl->setIncrementalStatus(true);
+      s.solver_id = i;
+      solvers.push_back(std::move(ptr));
+      active_incremental_solvers.push_back(s);
+    }
   }
 
   bool computeTruth(const Query &, bool &isValid) override;
@@ -49,100 +81,165 @@ public:
   void setCoreSolverTimeout(double timeout) override;
 
   void setIncrementalStatus(bool enable) override {
-    solver->impl->setIncrementalStatus(enable);
+    // active_incremental_solvers[0].solver->impl->setIncrementalStatus(enable);
   }
 
   bool getIncrementalStatus() override {
-    return solver->impl->getIncrementalStatus();
+    // return
+    // active_incremental_solvers[0].solver->impl->getIncrementalStatus();
+    return false;
   }
 
   void clearSolverStack() override {
-    clearSolverStackAndState();
+    for (size_t i = 0; i < active_incremental_solvers.size(); ++i)
+      clearSolverStackAndState(active_incremental_solvers[i]);
   }
 
-  void clearSolverStackAndState(const ExecutionState * newState = nullptr) {
-    usedConstraints.clear();
-
+  void clearSolverStackAndState(SolvingState &state,
+                                const ExecutionState *newState = nullptr) {
+    state.usedConstraints.clear();
     // force clearing of solver stack
-    solver->impl->clearSolverStack();
-    oldState = newState;
+    state.solver->impl->clearSolverStack();
+    state.oldState = newState;
+    state.state_uid = (newState ? newState->uid : 0);
   }
+
 protected:
   Query getPartialQuery(const Query &q);
 };
 
 Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
-  bool clearedStack = false;
-
-  use_index = 0;
-
-  /* avoid over approximation, if there aren't any constraints,
-   * we can't save anything */
+  // avoid over approximation, if there aren't any constraints,
+  // we can't save anything
   if (q.constraints.empty()) {
-    use_index = 1;
+    activeSolver = &active_incremental_solvers[0];
     return q;
   }
 
-  // In case we changed to a new state, we clear our saved state
-  if (q.queryOrigin != oldState) {
-    clearedStack = true;
-  }
-  //  else {
-  //    // Check if used constraints were deleted
-  //    for (auto pos : usedConstraints)
-  //      if (q.constraints.isDeleted(pos)) {
-  //        clearedStack = true;
-  //        break;
-  //      }
-  //  }
-
-  if (clearedStack) {
-    clearSolverStackAndState(q.queryOrigin);
-    q.incremental_flag = false;
-  } else {
-    q.incremental_flag = true;
-  }
-//  q.constraints.dump();
+  // Handle available stack of solvers
+  auto use_solver_index = active_solvers - 1;
+  activeSolver = &active_incremental_solvers.back();
 
   SimpleConstraintManager cm(activeConstraints);
-  cm.clear();
-
-  size_t reused_cntr = 0;
   std::unordered_set<ConstraintPosition> newlyAddedConstraints;
-  for (ConstraintSetView::const_iterator it = q.constraints.begin(),
-                                         itE = q.constraints.end();
-       it != itE; ++it) {
-    auto position = q.constraints.getPositions(it);
-//    llvm::errs() << "Position: " << position << "\n";
-//    (*it)->dump();
-    // Skip if we already used constraints from that position
-    if (usedConstraints.count(position)) {
-      ++reused_cntr;
+
+  // Check the incremental solvers
+  bool found_solver = false;
+  size_t max_inactive = 0;
+  while (use_solver_index > 0) {
+    activeSolver = &active_incremental_solvers[use_solver_index--];
+
+    // Update poor man's caching tracking
+    max_inactive = std::max(++(activeSolver->inactive), max_inactive);
+
+    // Check if we have a state already known
+    if (q.queryOrigin != activeSolver->oldState) {
       continue;
     }
 
-    if (position.origin >= 0)
-      newlyAddedConstraints.insert(position);
+    // Check if we have the same state but a different state_uid
+    // This indicates that the state was deleted, a new one created
+    // which has the same state as the old one
+    if (q.queryOrigin && q.queryOrigin->uid != activeSolver->state_uid) {
+      // TODO fix this
+      continue;
+    }
 
-    cm.push_back(*it);
+    // Prepare constraint manager
+    // Clear constraints used in previous partial request
+    cm.clear();
+
+    // Handle this known state
+
+    // Check if we already have constraints in common
+    size_t reused_cntr = 0;
+    newlyAddedConstraints.clear();
+    for (ConstraintSetView::const_iterator it = q.constraints.begin(),
+                                           itE = q.constraints.end();
+         it != itE; ++it) {
+      auto position = q.constraints.getPositions(it);
+
+      // Skip if we already used constraints from that position
+      if (activeSolver->usedConstraints.count(position)) {
+        ++reused_cntr;
+        continue;
+      }
+
+      if (position.origin >= 0)
+        newlyAddedConstraints.insert(position);
+
+      cm.push_back(*it);
+    }
+
+    // In case nothing found, try the next one
+    if (!reused_cntr) {
+      continue;
+    }
+
+    // Will use this solver
+    // Update statistics and save constraints
+    q.reused_cntr += reused_cntr;
+    q.query_size = activeSolver->usedConstraints.size();
+    q.added_constraints = newlyAddedConstraints.size();
+    q.solver_id = activeSolver->solver_id;
+
+    activeSolver->usedConstraints.insert(newlyAddedConstraints.begin(),
+                                         newlyAddedConstraints.end());
+    activeSolver->inactive = 0;
+    found_solver = true;
+
+    //    // we couldn't use the other solvers increment them as well
+    //    while (use_solver_index > 0)
+    //      active_incremental_solvers[use_solver_index--].inactive++;
+
+    break;
   }
 
-  if (!reused_cntr && usedConstraints.size()) {
-    use_index = 1;
+  // If we didn't find a solver yet, two options: add a new one or use an
+  // existing one
+  if (!found_solver) {
+    // Check if we still have space for a new solver
+    if (active_solvers < max_solvers) {
+      // Yes, use the next free solver
+      activeSolver = &active_incremental_solvers[active_solvers];
+      ++active_solvers;
+    } else {
+      // No, search for the oldest unused one
+      for (size_t i = 1; i < max_solvers; ++i) {
+        if (active_incremental_solvers[i].inactive == max_inactive) {
+          activeSolver = &active_incremental_solvers[i];
+          break;
+        }
+      }
+    }
+    clearSolverStackAndState(*activeSolver, q.queryOrigin);
     q.incremental_flag = false;
-    return q;
-  }
 
-  q.reused_cntr += reused_cntr;
-  q.query_size = usedConstraints.size();
-  usedConstraints.insert(newlyAddedConstraints.begin(), newlyAddedConstraints.end());
-  if (!clearedStack) {
+    // Clear constraints used in previous partial request
+    cm.clear();
+    std::unordered_set<ConstraintPosition> newlyAddedConstraints;
+    for (ConstraintSetView::const_iterator it = q.constraints.begin(),
+                                           itE = q.constraints.end();
+         it != itE; ++it) {
+      auto position = q.constraints.getPositions(it);
+
+      if (position.origin >= 0)
+        newlyAddedConstraints.insert(position);
+
+      cm.push_back(*it);
+    }
+    activeSolver->usedConstraints.insert(newlyAddedConstraints.begin(),
+                                         newlyAddedConstraints.end());
+    q.added_constraints = newlyAddedConstraints.size();
+    q.solver_id = activeSolver->solver_id;
+    activeSolver->inactive = 0;
+  } else {
+    // We found one existing solver, update stats
     ++stats::queryIncremental;
+    q.incremental_flag = true;
   }
 
   auto res = Query(activeConstraints, q.expr, q.queryOrigin);
-//  llvm::errs() << "New query:\n";
-//  res.dump();
   return res;
 }
 
@@ -150,53 +247,41 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
 
 bool IncrementalSolverImpl::computeTruth(const Query &q, bool &isValid) {
   auto newQuery = getPartialQuery(q);
-  if (!use_index)
-    return solver->impl->computeTruth(newQuery, isValid);
-  return simpleAdapter.impl->computeTruth(newQuery, isValid);
+  return activeSolver->solver->impl->computeTruth(newQuery, isValid);
 }
 
 bool IncrementalSolverImpl::computeValidity(const Query &q,
                                             Solver::Validity &result) {
   auto newQuery = getPartialQuery(q);
-  if (!use_index)
-    return solver->impl->computeValidity(newQuery, result);
-  return simpleAdapter.impl->computeValidity(newQuery, result);
+  return activeSolver->solver->impl->computeValidity(newQuery, result);
 }
 
 bool IncrementalSolverImpl::computeValue(const Query &q, ref<Expr> &result) {
   auto newQuery = getPartialQuery(q);
-  if (!use_index)
-    return solver->impl->computeValue(newQuery, result);
-  return simpleAdapter.impl->computeValue(newQuery, result);
+  return activeSolver->solver->impl->computeValue(newQuery, result);
 }
 
 bool IncrementalSolverImpl::computeInitialValues(
     const Query &query, const std::vector<const Array *> &objects,
     std::vector<std::vector<unsigned char> > &values, bool &hasSolution) {
   auto newQuery = getPartialQuery(query);
-  if (!use_index)
-    return solver->impl->computeInitialValues(newQuery, objects, values,
-                                              hasSolution);
-  return simpleAdapter.impl->computeInitialValues(newQuery, objects, values,
-                                                  hasSolution);
+  return activeSolver->solver->impl->computeInitialValues(newQuery, objects,
+                                                          values, hasSolution);
 }
 
 SolverImpl::SolverRunStatus IncrementalSolverImpl::getOperationStatusCode() {
-  if (!use_index)
-    return solver->impl->getOperationStatusCode();
-  return simpleAdapter.impl->getOperationStatusCode();
+  return activeSolver->solver->impl->getOperationStatusCode();
 }
 
 char *IncrementalSolverImpl::getConstraintLog(const Query &q) {
   auto newQuery = getPartialQuery(q);
-  if (!use_index)
-    return solver->impl->getConstraintLog(newQuery);
-  return simpleAdapter.impl->getConstraintLog(newQuery);
+  return activeSolver->solver->impl->getConstraintLog(newQuery);
 }
 
 void IncrementalSolverImpl::setCoreSolverTimeout(double timeout) {
-  solver->impl->setCoreSolverTimeout(timeout);
-  simpleAdapter.impl->setCoreSolverTimeout(timeout);
+  // We have to set the timeout of a potential future solver as well
+  for (size_t i = 0; i < std::min(active_solvers + 1, max_solvers); ++i)
+    active_incremental_solvers[i].solver->impl->setCoreSolverTimeout(timeout);
 }
 
 ///
