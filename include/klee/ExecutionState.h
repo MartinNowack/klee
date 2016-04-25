@@ -141,8 +141,7 @@ public:
   /// @brief Set of used array names for this state.  Used to avoid collisions.
   std::set<std::string> arrayNames;
 
-
-  /// @brief Universal ID of this state
+  /// Universal ID for this state
   uint64_t uid;
 
   std::string getFnAlias(std::string fn);
