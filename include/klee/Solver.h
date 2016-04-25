@@ -30,7 +30,8 @@ class ConstraintSetView;
     Query(const ConstraintSetView &_constraints, ref<Expr> _expr,
           const ExecutionState *originState)
         : constraints(_constraints), expr(_expr), queryOrigin(originState),
-          incremental_flag(false), reused_cntr(0), query_size(0) {}
+          incremental_flag(false), reused_cntr(0), query_size(0),
+          added_constraints(0), solver_id(0) {}
 
     /// withExpr - Return a copy of the query with the given expression.
     Query withExpr(ref<Expr> _expr) const {
@@ -55,6 +56,8 @@ class ConstraintSetView;
     mutable bool incremental_flag;
     mutable size_t reused_cntr;
     mutable size_t query_size;
+    mutable size_t added_constraints;
+    mutable size_t solver_id;
   };
 
   class Solver {

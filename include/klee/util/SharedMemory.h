@@ -25,6 +25,7 @@ public:
   void unlock();
   void wait(size_t id);
   // wait for signal or timeout
+  // @param duration in seconds
   // Returns true if condition set or false if timeout
   bool waitTimeout(size_t id, uint64_t duration);
   void signal(size_t id);
