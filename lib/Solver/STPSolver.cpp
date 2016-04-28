@@ -392,7 +392,10 @@ bool STPSolverImpl::computePartialInitialValues(
 
   bool emptyConstraints = query.constraints.empty();
   if (incremental && !emptyConstraints) {
-    vc_push(vc);
+    if (stackIndex.empty()) {
+      vc_push(vc);
+      stackIndex.push_back(1);
+    }
 
     for (ConstraintSetView::const_iterator it = sorted_constraints.begin(),
                                            ie = sorted_constraints.end();
@@ -400,8 +403,8 @@ bool STPSolverImpl::computePartialInitialValues(
       vc_assertFormula(vc, builder->construct(*it));
     }
 
-    auto lastIndex = (!stackIndex.empty() ? stackIndex.back() : 0);
-    stackIndex.push_back(lastIndex + query.constraints.size());
+    //    auto lastIndex = (!stackIndex.empty() ? stackIndex.back() : 0);
+    //    stackIndex.push_back(lastIndex + query.constraints.size());
   }
   ++stats::queries;
   ++stats::queryCounterexamples;
@@ -448,13 +451,17 @@ bool STPSolverImpl::computePartialInitialValues(
 }
 
 void STPSolverImpl::popStack(size_t index) {
-  while (!stackIndex.empty()) {
-    auto val = stackIndex.back();
-    stackIndex.pop_back();
+  if (!stackIndex.empty()) {
     vc_pop(vc);
-    if (val == index)
-      return;
+    stackIndex.clear();
   }
+  //  while (!stackIndex.empty()) {
+  //    auto val = stackIndex.back();
+  //    stackIndex.pop_back();
+  //    vc_pop(vc);
+  //    if (val == index)
+  //      return;
+  //  }
 }
 
 SolverImpl::SolverRunStatus STPSolverImpl::getOperationStatusCode() {
