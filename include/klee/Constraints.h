@@ -35,7 +35,7 @@ struct ConstraintPosition {
   ConstraintPosition(int64_t origin_, uint64_t unique_):
     origin(origin_), unique(unique_){}
   bool operator==(const ConstraintPosition &pos) const {
-    return (origin == pos.origin && unique == pos.unique);
+    return (origin == pos.origin && (unique == pos.unique || unique == 0));
   }
 };
 }
@@ -65,8 +65,8 @@ public:
   typedef constraints_ty::const_iterator const_iterator;
 
   bool empty() const { return constraints.empty(); }
-  constraint_iterator begin() const { return constraints.begin(); }
-  constraint_iterator end() const { return constraints.end(); }
+  constraint_iterator begin() const { return constraints.cbegin(); }
+  constraint_iterator end() const { return constraints.cend(); }
   size_t size() const { return constraints.size(); }
 
   ConstraintSetView() : next_free_position(0), uid_cntr(0) {}
@@ -77,9 +77,9 @@ public:
   void dump() const;
 
 private:
-  void push_back(ref<Expr> e, ConstraintPosition positions) {
+  void push_back(ref<Expr> e, ConstraintPosition &&positions) {
     constraints.push_back(e);
-    origPosition.push_back(positions);
+    origPosition.push_back(std::move(positions));
   }
 
   /**
@@ -132,7 +132,7 @@ protected:
   // returns true iff the constraints were modified
   bool rewriteConstraints(ExprVisitor &visitor);
 
-  void addConstraintInternal(ref<Expr> e, ConstraintPosition position);
+  void addConstraintInternal(ref<Expr> e, ConstraintPosition &&position);
 };
 
 /**

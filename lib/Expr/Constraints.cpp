@@ -110,7 +110,7 @@ bool ConstraintManager::rewriteConstraints(ExprVisitor &visitor) {
       addConstraintInternal(e, ConstraintPosition(positions.origin, constraintSetView.uid_cntr++)); // enable further reductions
       changed = true;
     } else {
-      constraintSetView.push_back(ce, positions);
+      constraintSetView.push_back(ce, std::move(positions));
     }
   }
 
@@ -143,7 +143,8 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) {
   return ConstraintManager::simplifyExpr(e, constraintSetView);
 }
 
-void ConstraintManager::addConstraintInternal(ref<Expr> e, ConstraintPosition position) {
+void ConstraintManager::addConstraintInternal(ref<Expr> e,
+                                              ConstraintPosition &&position) {
   // rewrite any known equalities and split Ands into different conjuncts
 
   switch (e->getKind()) {
@@ -174,12 +175,12 @@ void ConstraintManager::addConstraintInternal(ref<Expr> e, ConstraintPosition po
         rewriteConstraints(visitor);
       }
     }
-    constraintSetView.push_back(e, position);
+    constraintSetView.push_back(e, std::move(position));
     break;
   }
 
   default:
-    constraintSetView.push_back(e, position);
+    constraintSetView.push_back(e, std::move(position));
     break;
   }
 }
@@ -188,8 +189,6 @@ void ConstraintManager::addConstraint(ref<Expr> e) {
   TimerStatIncrementer t(stats::addConstraintTime);
 
   e = simplifyExpr(e);
-  addConstraintInternal(e,
-      ConstraintPosition(
-          constraintSetView.next_free_position++,
-          constraintSetView.uid_cntr++));
+  addConstraintInternal(
+      e, ConstraintPosition(constraintSetView.next_free_position++, 0));
 }
