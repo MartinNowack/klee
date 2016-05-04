@@ -313,7 +313,12 @@ KleeHandler::KleeHandler(int argc, char **argv)
     for (; i <= INT_MAX; ++i) {
       SmallString<128> d(directory);
       llvm::sys::path::append(d, "klee-out-");
-      raw_svector_ostream ds(d); ds << i; ds.flush();
+      raw_svector_ostream ds(d);
+      ds << i;
+// SmallString is always up-to-date, no need to flush. See Support/raw_ostream.h
+#if LLVM_VERSION_CODE < LLVM_VERSION(3, 8)
+      ds.flush();
+#endif
 
       // create directory and try to link klee-last
       if (mkdir(d.c_str(), 0775) == 0) {
@@ -1300,7 +1305,11 @@ int main(int argc, char **argv, char **envp) {
 #else
   mainModule = *mainModuleOrError;
 #endif
+#if LLVM_VERSION_CODE >= LLVM_VERSION(3, 8)
+  if (auto ec = mainModule->materializeAll()) {
+#else
   if (auto ec = mainModule->materializeAllPermanently()) {
+#endif
     klee_error("error loading program '%s': %s", InputFile.c_str(),
                ec.message().c_str());
   }
