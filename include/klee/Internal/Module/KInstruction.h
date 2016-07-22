@@ -13,6 +13,7 @@
 #include "klee/Config/Version.h"
 #include "llvm/Support/DataTypes.h"
 #include <vector>
+#include <string>
 
 namespace llvm {
   class Instruction;
@@ -29,6 +30,7 @@ namespace klee {
   struct KInstruction {
     llvm::Instruction *inst;    
     const InstructionInfo *info;
+    std::string inst_description;
 
     /// Value numbers for each operand. -1 is an invalid value,
     /// otherwise negative numbers are indices (negated and offset by
