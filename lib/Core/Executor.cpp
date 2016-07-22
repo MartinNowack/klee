@@ -1232,7 +1232,12 @@ void Executor::printDebugInstructions(ExecutionState &state) {
 
   if (optionIsSet(DebugPrintInstructions, STDERR_ALL) ||
       optionIsSet(DebugPrintInstructions, FILE_ALL))
-    (*stream) << ":" << *(state.pc->inst);
+    if (state.pc->inst_description.length() == 0) {
+      llvm::raw_string_ostream s(state.pc->inst_description);
+      state.pc->inst->print(s);
+      s.flush();
+    }
+    (*stream) << ":" << state.pc->inst_description;
   (*stream) << "\n";
 
   if (optionIsSet(DebugPrintInstructions, FILE_ALL) ||
