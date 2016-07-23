@@ -66,6 +66,11 @@ StackFrame::~StackFrame() {
 
 /***/
 
+static uint64_t generateStateUid(){
+  static uint64_t id = 1;
+  return id++;
+}
+
 ExecutionState::ExecutionState(KFunction *kf) :
     pc(kf->instructions),
     prevPC(pc),
@@ -78,11 +83,14 @@ ExecutionState::ExecutionState(KFunction *kf) :
     coveredNew(false),
     forkDisabled(false),
     ptreeNode(0) {
+  uid = generateStateUid();
   pushFrame(0, kf);
 }
 
 ExecutionState::ExecutionState(const std::vector<ref<Expr> > &assumptions)
-    : constraints(assumptions), queryCost(0.), ptreeNode(0) {}
+    : constraints(assumptions), queryCost(0.), ptreeNode(0) {
+  uid = generateStateUid();
+}
 
 ExecutionState::~ExecutionState() {
   for (unsigned int i=0; i<symbolics.size(); i++)
@@ -122,6 +130,7 @@ ExecutionState::ExecutionState(const ExecutionState& state):
     symbolics(state.symbolics),
     arrayNames(state.arrayNames)
 {
+  uid = generateStateUid();
   for (unsigned int i=0; i<symbolics.size(); i++)
     symbolics[i].first->refCount++;
 }

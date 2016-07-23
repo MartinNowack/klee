@@ -1229,6 +1229,7 @@ void Executor::printDebugInstructions(ExecutionState &state) {
     printFileLine(state, state.pc, *stream);
 
   (*stream) << state.pc->info->id;
+  (*stream) << ":" << state.uid;
 
   if (optionIsSet(DebugPrintInstructions, STDERR_ALL) ||
       optionIsSet(DebugPrintInstructions, FILE_ALL))
