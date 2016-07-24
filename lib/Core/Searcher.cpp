@@ -521,10 +521,12 @@ BatchingSearcher::~BatchingSearcher() {
 }
 
 ExecutionState &BatchingSearcher::selectState() {
+  // Select new state if none has been select before
+  // or the instruction/time budget is used up
   if (!lastState || 
-      (util::getWallTime()-lastStartTime)>timeBudget ||
+      ((timeBudget && util::getWallTime()-lastStartTime)>timeBudget) ||
       (stats::instructions-lastStartInstructions)>instructionBudget) {
-    if (lastState) {
+    if (timeBudget && lastState) {
       double delta = util::getWallTime()-lastStartTime;
       if (delta>timeBudget*1.1) {
         klee_message("KLEE: increased time budget from %f to %f\n", timeBudget,
