@@ -70,6 +70,7 @@ public:
       array_builder.setSize(ar.size);
       array_builder.setDomain(ar.domain);
       array_builder.setRange(ar.range);
+      array_builder.setUid(ar.uid);
 
       auto cv = array_builder.initConstantValue(ar.constantValues.size());
 
@@ -727,9 +728,13 @@ template <class T> class ExpressionDeserializer {
         ref<ConstantExpr> g = dyn_cast<ConstantExpr>(genExpr(c));
         ce.push_back(g);
       }
-      arrays.push_back(arrayCache->CreateArray(array.getName(), array.getSize(),
-                                               &ce[0], &ce[0] + ce.size(),
-                                               array.getDomain(), array.getRange()));
+      auto a = arrayCache->getArray(array.getUid());
+      if (!a || ce.empty())
+	      arrays.push_back(arrayCache->CreateArray(array.getName(), array.getSize(),
+						       &ce[0], &ce[0] + ce.size(),
+						       array.getDomain(), array.getRange()));
+      else
+	      arrays.push_back(a);
     }
   }
 

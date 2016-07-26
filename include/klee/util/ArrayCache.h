@@ -66,6 +66,8 @@ public:
                            const ref<ConstantExpr> *constantValuesEnd = 0,
                            Expr::Width _domain = Expr::Int32,
                            Expr::Width _range = Expr::Int8);
+  uint64_t getArrayUID(const Array*) const;
+  const Array *getArray(uint64_t uid) const;
 
 private:
   typedef unordered_set<const Array *, klee::ArrayHashFn,
