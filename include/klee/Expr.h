@@ -464,6 +464,8 @@ public:
   /// the array size.
   const std::vector<ref<ConstantExpr> > constantValues;
 
+  /// Unique ID of this array
+  mutable uint64_t uid;
 private:
   unsigned hashValue;
 

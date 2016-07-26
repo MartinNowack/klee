@@ -123,6 +123,7 @@ struct Array {
   size @1 : UInt64;
   domain @2 : UInt32;
   range @3 : UInt32;
+  uid @5: UInt64;
 
   constantValue @4: List(UInt32);
 }

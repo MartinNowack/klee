@@ -16,6 +16,16 @@ ArrayCache::~ArrayCache() {
   }
 }
 
+uint64_t ArrayCache::getArrayUID(const Array *ar) const {
+  return ar->uid;
+}
+
+const Array * ArrayCache::getArray(uint64_t uid) const {
+  if (uid >= concreteArrays.size())
+	  return 0;
+  return concreteArrays[uid];
+}
+
 const Array *
 ArrayCache::CreateArray(const std::string &_name, uint64_t _size,
                         const ref<ConstantExpr> *constantValuesBegin,
@@ -41,6 +51,7 @@ ArrayCache::CreateArray(const std::string &_name, uint64_t _size,
     // Treat every constant array as distinct so we never cache them
     assert(array->isConstantArray());
     concreteArrays.push_back(array); // For deletion later
+    array->uid = concreteArrays.size();
     return array;
   }
 }
