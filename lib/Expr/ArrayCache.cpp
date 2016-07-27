@@ -21,17 +21,16 @@ uint64_t ArrayCache::getArrayUID(const Array *ar) const {
 }
 
 const Array * ArrayCache::getArray(uint64_t uid) const {
-  if (uid >= concreteArrays.size())
+  if (!uid || uid > concreteArrays.size())
 	  return 0;
-  return concreteArrays[uid];
+  return concreteArrays[uid-1];
 }
 
 const Array *
 ArrayCache::CreateArray(const std::string &_name, uint64_t _size,
                         const ref<ConstantExpr> *constantValuesBegin,
                         const ref<ConstantExpr> *constantValuesEnd,
-                        Expr::Width _domain, Expr::Width _range) {
-
+                        Expr::Width _domain, Expr::Width _range, uint64_t uid) {
   const Array *array = new Array(_name, _size, constantValuesBegin,
                                  constantValuesEnd, _domain, _range);
   if (array->isSymbolicArray()) {
@@ -48,11 +47,20 @@ ArrayCache::CreateArray(const std::string &_name, uint64_t _size,
            "Cached symbolic array is no longer symbolic");
     return array;
   } else {
-    // Treat every constant array as distinct so we never cache them
     assert(array->isConstantArray());
-    concreteArrays.push_back(array); // For deletion later
-    array->uid = concreteArrays.size();
-    return array;
+    // If no uid is given, we just append to the current array cache
+    if (!uid) {
+      // Treat every constant array as distinct so we never cache them
+      concreteArrays.push_back(array); // For deletion later
+      array->uid = concreteArrays.size() + 1;
+      return array;
+    } else {
+      array->uid = uid;
+      if (uid > concreteArrays.size())
+        concreteArrays.resize(uid);
+      concreteArrays[uid - 1] = array;
+      return array;
+    }
   }
 }
 }
