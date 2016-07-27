@@ -732,7 +732,7 @@ template <class T> class ExpressionDeserializer {
       if (!a || ce.empty())
 	      arrays.push_back(arrayCache->CreateArray(array.getName(), array.getSize(),
 						       &ce[0], &ce[0] + ce.size(),
-						       array.getDomain(), array.getRange()));
+						       array.getDomain(), array.getRange(),array.getUid()));
       else
 	      arrays.push_back(a);
     }
