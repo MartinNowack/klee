@@ -22,6 +22,45 @@
 
 using namespace klee;
 
+#if LLVM_VERSION_CODE < LLVM_VERSION(3, 0)
+namespace llvm {
+namespace cl {
+
+//--------------------------------------------------
+// parser<unsigned long long>
+//
+template<>
+class parser<unsigned long long> : public basic_parser<unsigned long long> {
+public:
+  // parse - Return true on error.
+  bool parse(Option &O, StringRef ArgName, StringRef Arg, unsigned long long &Val);
+
+  // getValueName - Overload in subclass to provide a better default value.
+  virtual const char *getValueName() const { return "number"; }
+
+  // An out-of-line virtual method to provide a 'home' for this class.
+  virtual void anchor();
+
+};
+
+TEMPLATE_INSTANTIATION(class basic_parser<unsigned long long>);
+
+void parser<unsigned long long>::anchor() {}
+
+// parser<unsigned long long> implementation
+//
+bool parser<unsigned long long>::parse(Option &O, StringRef ArgName,
+                                      StringRef Arg, unsigned long long &Value){
+
+  if (Arg.getAsInteger(0, Value))
+    return O.error("'" + Arg + "' value invalid for uint argument!");
+  return false;
+}
+
+}
+}
+#endif
+
 namespace {
 llvm::cl::opt<bool> DeterministicAllocation(
     "allocate-determ",
