@@ -210,6 +210,8 @@ private:
   // @brief buffer to store logs before flushing to file
   llvm::raw_string_ostream debugLogBuffer;
 
+  llvm::raw_ostream *stackTrackFile;
+
   llvm::Function* getTargetFunction(llvm::Value *calledVal,
                                     ExecutionState &state);
   

@@ -163,6 +163,11 @@ namespace {
       cl::desc("Compress the logged instructions in gzip format."));
 #endif
 
+  cl::opt<bool> TrackStackFrameHandling(
+      "track-stack-frame-handling",
+      llvm::cl::desc("Track the push/pop of stack frames"),
+      llvm::cl::init(false));
+
   cl::opt<bool>
   DebugCheckForImpliedValues("debug-check-for-implied-values");
 
@@ -353,7 +358,7 @@ Executor::Executor(const InterpreterOptions &opts, InterpreterHandler *ih)
       coreSolverTimeout(MaxCoreSolverTime != 0 && MaxInstructionTime != 0
                             ? std::min(MaxCoreSolverTime, MaxInstructionTime)
                             : std::max(MaxCoreSolverTime, MaxInstructionTime)),
-      debugInstFile(0), debugLogBuffer(debugBufferString) {
+      debugInstFile(0), debugLogBuffer(debugBufferString), stackTrackFile(0) {
 
   if (coreSolverTimeout) UseForkedCoreSolver = true;
   Solver *coreSolver = klee::createCoreSolver(CoreSolverToUse);
@@ -396,6 +401,34 @@ Executor::Executor(const InterpreterOptions &opts, InterpreterHandler *ih)
 #endif
     if (ErrorInfo != "") {
       klee_error("Could not open file %s : %s", debug_file_name.c_str(),
+                 ErrorInfo.c_str());
+    }
+  }
+
+  if (TrackStackFrameHandling) {
+    std::string ErrorInfo;
+    std::string stack_track_file_name =
+        interpreterHandler->getOutputFilename("stacktrack.txt");
+#ifdef HAVE_ZLIB_H
+    if (!DebugCompressInstructions) {
+#endif
+
+#if LLVM_VERSION_CODE >= LLVM_VERSION(3, 5)
+      stackTrackFile =
+          new llvm::raw_fd_ostream(stack_track_file_name.c_str(), ErrorInfo,
+                                   llvm::sys::fs::OpenFlags::F_Text),
+#else
+    stackTrackFile =
+        new llvm::raw_fd_ostream(stack_track_file_name.c_str(), ErrorInfo);
+#endif
+#ifdef HAVE_ZLIB_H
+    } else {
+      stackTrackFile = new compressed_fd_ostream(
+          (stack_track_file_name + ".gz").c_str(), ErrorInfo);
+    }
+#endif
+    if (ErrorInfo != "") {
+      klee_error("Could not open file %s : %s", stack_track_file_name.c_str(),
                  ErrorInfo.c_str());
     }
   }
@@ -451,6 +484,9 @@ Executor::~Executor() {
   if (debugInstFile) {
     delete debugInstFile;
   }
+
+  if (stackTrackFile)
+    delete stackTrackFile;
 }
 
 /***/
@@ -1340,6 +1376,13 @@ void Executor::executeCall(ExecutionState &state,
     state.pushFrame(state.prevPC, kf);
     state.pc = kf->instructions;
 
+    if (stackTrackFile) {
+      std::string file = (state.prevPC ? state.prevPC->info->file : "");
+      uint64_t line = (state.prevPC ? state.prevPC->info->line : 0);
+      (*stackTrackFile) << "Push: " << kf->function->getName().str() << file
+                        << ":" << line << "\n";
+    }
+
     if (statsTracker)
       statsTracker->framePushed(state, &state.stack[state.stack.size()-2]);
 
@@ -1545,6 +1588,14 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       terminateStateOnExit(state);
     } else {
       state.popFrame();
+
+      if (stackTrackFile) {
+        std::string file = (kcaller ? kcaller->info->file : "");
+        uint64_t line = (kcaller ? kcaller->info->line : 0);
+        (*stackTrackFile) << "Pop: "
+                          << state.stack.back().kf->function->getName().str()
+                          << file << ":" << line << "\n";
+      }
 
       if (statsTracker)
         statsTracker->framePopped(state);
