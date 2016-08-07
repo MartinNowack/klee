@@ -1326,6 +1326,28 @@ int main(int argc, char **argv, char **envp) {
     klee_message("NOTE: Using model: %s", Path.c_str());
     mainModule = klee::linkWithLibrary(mainModule, Path.c_str());
     assert(mainModule && "unable to link with simple model");
+
+    // We need to handle asm-prefixed versions coming from KLEE's POSIX runtime library
+    for (Module::iterator fi = mainModule->begin(), fe = mainModule->end();
+        fi != fe; ++fi) {
+      Function* f = fi;
+      const std::string& name = f->getName();
+      if (name[0] == '\01') {
+        std::string unprefixed = name.substr(1);
+        // Check, if we can find the unprefixed version
+        Function* f2 = mainModule->getFunction(unprefixed);
+
+        // If not found, just rename the current one
+        if (!f2) {
+          f->setName(unprefixed);
+        } else if (f2->isDeclaration()) {
+          f2->replaceAllUsesWith(f);
+          f2->eraseFromParent();
+          f->setName(unprefixed);
+        }
+      }
+    }
+
   }
 
   std::vector<std::string>::iterator libs_it;
