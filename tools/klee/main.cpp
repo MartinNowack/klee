@@ -1031,6 +1031,34 @@ static void replaceOrRenameFunction(llvm::Module *module,
     }
   }
 }
+
+void removeAsmPrefix(llvm::Module* mainModule) {
+  // Strip of asm prefixes for 64 bit versions because they are not
+  // present in uclibc and we want to make sure stuff will get
+  // linked. In the off chance that both prefixed and unprefixed
+  // versions are present in the module, make sure we don't create a
+  // naming conflict.
+  for (Module::iterator fi = mainModule->begin(), fe = mainModule->end();
+      fi != fe; ++fi) {
+    Function* f = fi;
+    const std::string& name = f->getName();
+    if (name[0] == '\01') {
+      llvm::errs() << "Prefixed Version: " << name << "\n";
+      unsigned size = name.size();
+      if (name[size - 2] == '6' && name[size - 1] == '4') {
+        std::string unprefixed = name.substr(1);
+        // See if the unprefixed version exists.
+        if (Function* f2 = mainModule->getFunction(unprefixed)) {
+          f->replaceAllUsesWith(f2);
+          f->eraseFromParent();
+        } else {
+          f->setName(unprefixed);
+        }
+      }
+    }
+  }
+}
+
 static llvm::Module *linkWithUclibc(llvm::Module *mainModule, StringRef libDir) {
   // Ensure that klee-uclibc exists
   SmallString<128> uclibcBCA(libDir);
@@ -1073,30 +1101,7 @@ static llvm::Module *linkWithUclibc(llvm::Module *mainModule, StringRef libDir) 
   f = mainModule->getFunction("__ctype_get_mb_cur_max");
   if (f) f->setName("_stdlib_mb_cur_max");
 
-  // Strip of asm prefixes for 64 bit versions because they are not
-  // present in uclibc and we want to make sure stuff will get
-  // linked. In the off chance that both prefixed and unprefixed
-  // versions are present in the module, make sure we don't create a
-  // naming conflict.
-  for (Module::iterator fi = mainModule->begin(), fe = mainModule->end();
-       fi != fe; ++fi) {
-    Function *f = fi;
-    const std::string &name = f->getName();
-    if (name[0]=='\01') {
-      unsigned size = name.size();
-      if (name[size-2]=='6' && name[size-1]=='4') {
-        std::string unprefixed = name.substr(1);
-
-        // See if the unprefixed version exists.
-        if (Function *f2 = mainModule->getFunction(unprefixed)) {
-          f->replaceAllUsesWith(f2);
-          f->eraseFromParent();
-        } else {
-          f->setName(unprefixed);
-        }
-      }
-    }
-  }
+  removeAsmPrefix(mainModule);
 
   mainModule = klee::linkWithLibrary(mainModule, uclibcBCA.c_str());
   assert(mainModule && "unable to link with uclibc");
