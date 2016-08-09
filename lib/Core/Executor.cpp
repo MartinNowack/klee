@@ -1308,7 +1308,17 @@ void Executor::executeCall(ExecutionState &state,
     switch(f->getIntrinsicID()) {
     case Intrinsic::not_intrinsic:
       // state may be destroyed by this call, cannot touch
+      if (stackTrackFile) {
+        (*stackTrackFile) << "Push (External): " << state.uid << ":"
+                          << f->getName().str() << "\n";
+      }
+
       callExternalFunction(state, ki, f, arguments);
+      if (stackTrackFile) {
+        (*stackTrackFile) << "Pop (External): " << state.uid << ":"
+                          << f->getName().str() << "\n";
+      }
+
       break;
         
       // va_arg is handled by caller and intrinsic lowering, see comment for
@@ -1379,8 +1389,9 @@ void Executor::executeCall(ExecutionState &state,
     if (stackTrackFile) {
       std::string file = (state.prevPC ? state.prevPC->info->file : "");
       uint64_t line = (state.prevPC ? state.prevPC->info->line : 0);
-      (*stackTrackFile) << "Push: " << kf->function->getName().str() << file
-                        << ":" << line << "\n";
+      (*stackTrackFile) << "Push: " << state.uid << ":"
+                        << kf->function->getName().str() << ":" << file << ":"
+                        << line << "\n";
     }
 
     if (statsTracker)
@@ -1592,9 +1603,9 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       if (stackTrackFile) {
         std::string file = (kcaller ? kcaller->info->file : "");
         uint64_t line = (kcaller ? kcaller->info->line : 0);
-        (*stackTrackFile) << "Pop: "
+        (*stackTrackFile) << "Pop: " << state.uid << ":"
                           << state.stack.back().kf->function->getName().str()
-                          << file << ":" << line << "\n";
+                          << ":" << file << ":" << line << "\n";
       }
 
       if (statsTracker)
@@ -2839,8 +2850,22 @@ void Executor::run(ExecutionState &initialState) {
   std::vector<ExecutionState *> newStates(states.begin(), states.end());
   searcher->update(0, newStates, std::vector<ExecutionState *>());
 
+  ExecutionState *oldState = 0;
   while (!states.empty() && !haltExecution) {
     ExecutionState &state = searcher->selectState();
+    if (stackTrackFile) {
+      if (!oldState)
+        oldState = &state;
+      if (state.uid != oldState->uid) {
+        KInstruction *kcaller = state.pc;
+        std::string file = (kcaller ? kcaller->info->file : "");
+        uint64_t line = (kcaller ? kcaller->info->line : 0);
+        (*stackTrackFile) << "NS: " << state.uid << ":"
+                          << state.stack.back().kf->function->getName().str()
+                          << ":" << file << ":" << line << "\n";
+        oldState = &state;
+      }
+    }
     KInstruction *ki = state.pc;
     stepInstruction(state);
 
