@@ -1273,6 +1273,12 @@ void Executor::printDebugInstructions(ExecutionState &state) {
       llvm::raw_string_ostream s(state.pc->inst_description);
       state.pc->inst->print(s);
       s.flush();
+      // delete new lines from the string, e.g. for switch instructions, to
+      // have just one line this way, every line in the file is one instruction
+      state.pc->inst_description.erase(
+          std::remove(state.pc->inst_description.begin(),
+              state.pc->inst_description.end(), '\n'),
+          state.pc->inst_description.end());
     }
     (*stream) << ":" << state.pc->inst_description;
   (*stream) << "\n";
