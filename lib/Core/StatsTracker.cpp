@@ -218,7 +218,7 @@ StatsTracker::StatsTracker(Executor &_executor, std::string _objectFilename,
     }
   }
 
-  if (OutputIStats)
+  if (OutputIStats || updateMinDistToUncovered)
     theStatisticManager->useIndexedStats(km->infos->getMaxID());
 
   for (std::vector<KFunction*>::iterator it = km->functions.begin(), 
