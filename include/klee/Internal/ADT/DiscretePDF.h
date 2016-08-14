@@ -8,7 +8,7 @@
 //===----------------------------------------------------------------------===//
 
 namespace klee {
-  template <class T>
+  template <class T, class Compare = std::less<T> >
   class DiscretePDF {
     // not perfectly parameterized, but float/double/int should work ok,
     // although it would be better to have choose argument range from 0
@@ -16,7 +16,7 @@ namespace klee {
     typedef double weight_type;
 
   public:
-    DiscretePDF();
+    DiscretePDF(const Compare& c = Compare());
     ~DiscretePDF();
 
     bool empty() const;
@@ -34,6 +34,7 @@ namespace klee {
   private:
     class Node;
     Node *m_root;
+    Compare cmp;
     
     Node **lookup(T item, Node **parent_out);
     void split(Node *node);

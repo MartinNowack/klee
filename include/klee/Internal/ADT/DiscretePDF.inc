@@ -9,8 +9,8 @@
 
 namespace klee {
 
-template <class T>
-class DiscretePDF<T>::Node
+template <class T, class C>
+class DiscretePDF<T, C>::Node
 {
 private:
   bool m_mark;
@@ -40,8 +40,8 @@ public:
 
   ///
 
-template <class T>
-DiscretePDF<T>::Node::Node(T key_, weight_type weight_, Node *parent_) {
+template <class T, class C>
+DiscretePDF<T, C>::Node::Node(T key_, weight_type weight_, Node *parent_) {
   m_mark = false;
 
   key = key_;
@@ -51,31 +51,32 @@ DiscretePDF<T>::Node::Node(T key_, weight_type weight_, Node *parent_) {
   parent = parent_;
 }
 
-template <class T>
-DiscretePDF<T>::Node::~Node() {
+template <class T, class C>
+DiscretePDF<T, C>::Node::~Node() {
   if (left) delete left;
   if (right) delete right;
 }
 
 //
 
-template <class T>
-DiscretePDF<T>::DiscretePDF() {
+template <class T, class C>
+DiscretePDF<T, C>::DiscretePDF(const C& c) {
   m_root = 0;
+  cmp = c;
 }
 
-template <class T>
-DiscretePDF<T>::~DiscretePDF() {
+template <class T, class C>
+DiscretePDF<T, C>::~DiscretePDF() {
   if (m_root) delete m_root;
 }
 
-template <class T>
-bool DiscretePDF<T>::empty() const {
+template <class T, class C>
+bool DiscretePDF<T, C>::empty() const {
   return m_root == 0;
 }
 
-template <class T>
-void DiscretePDF<T>::insert(T item, weight_type weight) {
+template <class T, class C>
+void DiscretePDF<T, C>::insert(T item, weight_type weight) {
   Node *p=0, *n=m_root;
 
   while (n) {
@@ -83,10 +84,10 @@ void DiscretePDF<T>::insert(T item, weight_type weight) {
       split(n);
 
     p = n;
-    if (n->key==item) {
+    if (!cmp(n->key,item) && !cmp(item, n->key)) {
       assert(0 && "insert: argument(item) already in tree");
     } else {
-      n = (item<n->key)?n->left:n->right;
+      n = (cmp(item,n->key))?n->left:n->right;
     }
   }
 
@@ -95,7 +96,7 @@ void DiscretePDF<T>::insert(T item, weight_type weight) {
   if (!p) {
     m_root = n;
   } else {
-    if (item<p->key) {
+    if (cmp(item,p->key)) {
       p->left = n;
     } else {
       p->right = n;
@@ -107,8 +108,8 @@ void DiscretePDF<T>::insert(T item, weight_type weight) {
   propogateSumsUp(n);
 }
 
-template <class T>
-void DiscretePDF<T>::remove(T item) {
+template <class T, class C>
+void DiscretePDF<T, C>::remove(T item) {
   Node **np = lookup(item, 0);
   Node *child, *n = *np;
 
@@ -148,8 +149,8 @@ void DiscretePDF<T>::remove(T item) {
   }
 }
 
-template <class T>
-void DiscretePDF<T>::update(T item, weight_type weight) {
+template <class T, class C>
+void DiscretePDF<T, C>::update(T item, weight_type weight) {
   Node *n = *lookup(item, 0);
 
   if (!n) {
@@ -160,8 +161,8 @@ void DiscretePDF<T>::update(T item, weight_type weight) {
   }
 }
 
-template <class T>
-T DiscretePDF<T>::choose(double p) {
+template <class T, class C>
+T DiscretePDF<T, C>::choose(double p) {
   if ((p < 0.0) || (p >= 1.0))
     assert(0 && "choose: argument(p) outside valid range");
 
@@ -190,15 +191,15 @@ T DiscretePDF<T>::choose(double p) {
   return n->key;
 }
 
-template <class T>
-bool DiscretePDF<T>::inTree(T item) {
+template <class T, class C>
+bool DiscretePDF<T, C>::inTree(T item) {
   Node *n = *lookup(item, 0);
 
   return !!n;
 }
 
-template <class T>
-typename DiscretePDF<T>::weight_type DiscretePDF<T>::getWeight(T item) {
+template <class T, class C>
+typename DiscretePDF<T, C>::weight_type DiscretePDF<T, C>::getWeight(T item) {
   Node *n = *lookup(item, 0);
   assert(n);
   return n->weight;
@@ -206,17 +207,17 @@ typename DiscretePDF<T>::weight_type DiscretePDF<T>::getWeight(T item) {
 
 //
 
-template <class T>
-typename DiscretePDF<T>::Node **
-DiscretePDF<T>::lookup(T item, Node **parent_out) {
+template <class T, class C>
+typename DiscretePDF<T, C>::Node **
+DiscretePDF<T, C>::lookup(T item, Node **parent_out) {
   Node *n, *p=0, **np=&m_root;
 
   while ((n = *np)) {
-    if (n->key==item) {
+    if (!cmp(n->key,item) && !cmp(item, n->key)) {
       break;
     } else {
       p = n;
-      if (item<n->key) {
+      if (cmp(item,n->key)) {
         np = &n->left;
       } else {
         np = &n->right;
@@ -229,8 +230,8 @@ DiscretePDF<T>::lookup(T item, Node **parent_out) {
   return np;
 }
 
-template <class T>
-void DiscretePDF<T>::split(Node *n) {
+template <class T, class C>
+void DiscretePDF<T, C>::split(Node *n) {
   if (n->left) n->left->markBlack();
   if (n->right) n->right->markBlack();
 
@@ -255,8 +256,8 @@ void DiscretePDF<T>::split(Node *n) {
   }
 }
 
-template <class T>
-void DiscretePDF<T>::rotate(Node *n) {
+template <class T, class C>
+void DiscretePDF<T, C>::rotate(Node *n) {
   Node *p=n->parent, *pp=p->parent;
 
   n->parent = pp;
@@ -286,8 +287,8 @@ void DiscretePDF<T>::rotate(Node *n) {
   }
 }
 
-template <class T>
-void DiscretePDF<T>::lengthen(Node *n) {
+template <class T, class C>
+void DiscretePDF<T, C>::lengthen(Node *n) {
   if (!n->isBlack()) {
     n->markBlack();
   } else if (n->parent) {
@@ -337,8 +338,8 @@ void DiscretePDF<T>::lengthen(Node *n) {
   }
 }
 
-template <class T>
-void DiscretePDF<T>::propogateSumsUp(Node *n) {
+template <class T, class C>
+void DiscretePDF<T, C>::propogateSumsUp(Node *n) {
   for (; n; n=n->parent)
     n->setSum();
 }

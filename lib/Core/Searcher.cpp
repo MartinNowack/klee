@@ -175,7 +175,7 @@ RandomSearcher::update(ExecutionState *current,
 ///
 
 WeightedRandomSearcher::WeightedRandomSearcher(WeightType _type)
-  : states(new DiscretePDF<ExecutionState*>()),
+  : states(new DiscretePDF<ExecutionState*,cmpByExecutionStateUid>()),
     type(_type) {
   switch(type) {
   case Depth: 
