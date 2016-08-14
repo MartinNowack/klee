@@ -15,6 +15,7 @@
 #include <set>
 #include <map>
 #include <queue>
+#include "klee/ExecutionState.h"
 
 namespace llvm {
   class BasicBlock;
@@ -24,7 +25,7 @@ namespace llvm {
 }
 
 namespace klee {
-  template<class T> class DiscretePDF;
+  template<class T, class C> class DiscretePDF;
   class ExecutionState;
   class Executor;
 
@@ -122,6 +123,12 @@ namespace klee {
     }
   };
 
+  class cmpByExecutionStateUid {
+  public:
+    bool operator()(const ExecutionState*a, ExecutionState*b) const{
+      return a->uid < b->uid;
+    }
+  };
   class WeightedRandomSearcher : public Searcher {
   public:
     enum WeightType {
@@ -134,7 +141,7 @@ namespace klee {
     };
 
   private:
-    DiscretePDF<ExecutionState*> *states;
+    DiscretePDF<ExecutionState*, cmpByExecutionStateUid> *states;
     WeightType type;
     bool updateWeights;
     
