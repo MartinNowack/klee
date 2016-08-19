@@ -423,6 +423,8 @@ void StatsTracker::writeStatsHeader() {
 #ifdef DEBUG
 	     << "'ArrayHashTime',"
 #endif
+	     << "'CacheHits',"
+	     << "'CacheMisses',"
              << ")\n";
   statsFile->flush();
 }
@@ -453,6 +455,8 @@ void StatsTracker::writeStatsLine() {
 #ifdef DEBUG
              << "," << stats::arrayHashTime / 1000000.
 #endif
+	     << "," << stats::queryCacheHits
+	     << "," << stats::queryCacheMisses
              << ")\n";
   statsFile->flush();
 }
