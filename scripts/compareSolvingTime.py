@@ -2,6 +2,9 @@
 import sys
 for line in sys.stdin:
     sl = line.split()
-    if sl[1] != "OK":
+    if len(sl) <= 1 or sl[1] != "OK":
         continue
-    print(sl[4], sl[10])
+    if len(sl) == 11:
+        print(sl[4], sl[10])
+    else:
+        print(sl[4], sl[9])
