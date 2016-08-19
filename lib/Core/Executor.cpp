@@ -360,7 +360,7 @@ Executor::Executor(const InterpreterOptions &opts, InterpreterHandler *ih)
     : Interpreter(opts), kmodule(0), interpreterHandler(ih), searcher(0),
       externalDispatcher(new ExternalDispatcher()), statsTracker(0),
       pathWriter(0), symPathWriter(0), specialFunctionHandler(0),
-      processTree(0), replayKTest(0), replayPath(0), usingSeeds(0),
+      processTree(0), replayKTest(0), replayPath(0), replayPosition(0), usingSeeds(0),
       atMemoryLimit(false), inhibitForking(false), haltExecution(false),
       ivcEnabled(false),
       coreSolverTimeout(MaxCoreSolverTime != 0 && MaxInstructionTime != 0
