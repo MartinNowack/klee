@@ -10,17 +10,20 @@
 #ifndef KLEE_CONSTRAINTS_H
 #define KLEE_CONSTRAINTS_H
 
-#include <stddef.h>
-#include <sys/types.h>
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <iterator>
-#include <vector>
+#include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
+#include "Expr.h"
 #include "util/Ref.h"
 
 namespace klee {
 
+class Array;
 class ExprVisitor;
 class ConstraintManager;
 class ConstraintSetView;
@@ -30,23 +33,60 @@ class Expr;
 
 
 struct ConstraintPosition {
-  int64_t origin;
-  uint64_t unique;
-  ConstraintPosition(int64_t origin_, uint64_t unique_):
-    origin(origin_), unique(unique_){}
-  bool operator==(const ConstraintPosition &pos) const {
-    return (origin == pos.origin && (unique == pos.unique || unique == 0));
+  // Unique ID of the constraint
+  uint64_t constraint_id;
+
+  // Width of the constraint, which is essentially the
+  // number of nodes
+  uint64_t constraint_width;
+
+  // Cache of contained symbols inside the constraints
+  std::vector<const Array *> contained_symbols;
+
+  ConstraintPosition(uint64_t constraint_id_, uint64_t constraint_width_,
+                     std::vector<const Array *> &&contained_symbols_);
+  // overloaded < operator
+  bool operator<(const ConstraintPosition &d) {
+    if (constraint_id < d.constraint_id)
+      return true;
+    if (constraint_id == d.constraint_id &&
+        constraint_width < d.constraint_width)
+      return true;
+    return false;
   }
 };
 }
-namespace std {
-template <>
-struct hash<klee::ConstraintPosition> {
-  size_t operator() (const klee::ConstraintPosition &pos) const {
-    return hash<int64_t>()(pos.origin);
+
+struct ConstraintPositionHash {
+  size_t operator()(const klee::ConstraintPosition &e) const {
+    return std::hash<uint64_t>()(e.constraint_id);
   }
 };
-}
+
+struct ConstraintPositionEqual {
+  bool operator()(const klee::ConstraintPosition &a,
+                  const klee::ConstraintPosition &b) const {
+    if (a.constraint_id != b.constraint_id)
+      return false;
+    if (a.constraint_width != b.constraint_width)
+      return false;
+    if (a.contained_symbols != b.contained_symbols)
+      return false;
+    return true;
+  }
+};
+
+struct ConstraintPositionLess {
+  bool operator()(const klee::ConstraintPosition &a,
+                  const klee::ConstraintPosition &b) const {
+    if (a.constraint_id < b.constraint_id)
+      return true;
+    if (a.constraint_id == b.constraint_id &&
+        a.constraint_width < b.constraint_width)
+      return false;
+    return true;
+  }
+};
 
 namespace klee {
 /**
@@ -69,39 +109,32 @@ public:
   constraint_iterator end() const { return constraints.cend(); }
   size_t size() const { return constraints.size(); }
 
-  ConstraintSetView() : next_free_position(0), uid_cntr(0) {}
+  ConstraintSetView() {}
 
-  bool operator==(const ConstraintSetView &other) const {
-    return constraints == other.constraints;
-  }
+  bool operator==(const ConstraintSetView &other) const;
+
   void dump() const;
 
 private:
-  void push_back(ref<Expr> e, ConstraintPosition &&positions) {
-    constraints.push_back(e);
-    origPosition.push_back(std::move(positions));
-  }
+  void push_back(ref<Expr> e, ConstraintPosition &&positions);
 
   /**
    * Moves constraints to other but keeps state.
    */
   void extractAndResetConstraints(ConstraintSetView &other);
   constraints_ty constraints;
-  int64_t next_free_position;
-  uint64_t uid_cntr;
+  static uint64_t next_free_position;
+  static uint64_t version_cntr;
 
 
   // Tracks origin position for each set
   // First: the origin position, second unique id
   std::vector<ConstraintPosition> origPosition;
-  std::unordered_set<ConstraintPosition> deletedPositions;
 
 public:
-  ConstraintPosition getPositions(const_iterator it) const {
-    return origPosition[it - constraints.begin()];
-  }
+  ConstraintPosition getPositions(const_iterator it) const;
 
-  bool isDeleted(const ConstraintPosition &pos) const { return deletedPositions.count(pos); }
+  std::vector<const Array*> getUsedArrays() const;
 };
 
 /**
@@ -141,20 +174,13 @@ protected:
 class SimpleConstraintManager : public ConstraintManager {
 public:
   SimpleConstraintManager(ConstraintSetView &view) : ConstraintManager(view) {}
-  // Add Constaint without simplification
-  void push_back(ref<Expr> expr) {
-    constraintSetView.push_back(expr,
-        ConstraintPosition(constraintSetView.next_free_position++,
-            constraintSetView.uid_cntr++));
-  }
+
+  // Add constraint without simplification
+  void push_back(ref<Expr> expr);
 
   SimpleConstraintManager(const SimpleConstraintManager &) = delete;
 
-  void clear() {
-    constraintSetView.constraints.clear();
-    constraintSetView.origPosition.clear();
-    constraintSetView.next_free_position = 0;
-  }
+  void clear();
 };
 
 /**
@@ -165,13 +191,7 @@ public:
   ReferencingConstraintManager(ConstraintSetView &newView,
                                const ConstraintSetView &_oldView)
       : ConstraintManager(newView), oldView(_oldView) {}
-  void push_back(ref<Expr> expr) {
-    auto it = std::find(oldView.begin(), oldView.end(), expr);
-    if (it == oldView.end())
-      constraintSetView.push_back(expr, ConstraintPosition(/* unknown */ -1, /* unknown */ 0));
-    else
-      constraintSetView.push_back(expr, oldView.getPositions(it));
-  }
+  void push_back(ref<Expr> expr);
 
   ReferencingConstraintManager(const SimpleConstraintManager &) = delete;
 

@@ -23,7 +23,7 @@ struct SolvingState {
   const ExecutionState *oldState;
   uint64_t state_uid;
 
-  std::unordered_set<ConstraintPosition> usedConstraints;
+  std::vector<ConstraintPosition> usedConstraints;
   size_t inactive;
   size_t solver_id;
   SolvingState(Solver *solver_)
@@ -36,7 +36,10 @@ private:
   std::vector<SolvingState> active_incremental_solvers;
   std::vector<std::unique_ptr<ClientProcessAdapterSolver> > solvers;
 
+  // Maximum number of solver instances to be used
   const size_t max_solvers;
+
+  // Number of currently active solvers
   size_t active_solvers;
 
   // Index of solver from active_incremental_solvers to use
@@ -46,7 +49,7 @@ private:
   ConstraintSetView activeConstraints;
 public:
   IncrementalSolverImpl(Solver *solver)
-      : max_solvers(10), active_solvers(1), activeSolver(nullptr) {
+      : max_solvers(2), active_solvers(1), activeSolver(nullptr) {
     // Add basic core solver
     SolvingState state(solver);
     active_incremental_solvers.push_back(state);
@@ -121,7 +124,9 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
   activeSolver = &active_incremental_solvers.back();
 
   SimpleConstraintManager cm(activeConstraints);
-  std::unordered_set<ConstraintPosition> newlyAddedConstraints;
+  std::vector<ConstraintPosition> newlyAddedConstraints;
+
+  std::vector<const Array*> used_arrays = q.constraints.getUsedArrays();
 
   // Check the incremental solvers
   bool found_solver = false;
@@ -132,47 +137,84 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
     // Update poor man's caching tracking
     max_inactive = std::max(++(activeSolver->inactive), max_inactive);
 
-    // Check if we have a state already known
-    if (q.queryOrigin != activeSolver->oldState) {
-      continue;
-    }
-
-    // Check if we have the same state but a different state_uid
-    // This indicates that the state was deleted, a new one created
-    // which has the same state as the old one
-    if (q.queryOrigin && q.queryOrigin->uid != activeSolver->state_uid) {
-      // TODO fix this
-      continue;
-    }
-
     // Prepare constraint manager
     // Clear constraints used in previous partial request
     cm.clear();
 
-    // Handle this known state
+    // Check if we already have constraints in common and which are conflicting
 
-    // Check if we already have constraints in common
+    // ASSUMPTION: both vectors are in order
     size_t reused_cntr = 0;
     newlyAddedConstraints.clear();
-    for (ConstraintSetView::const_iterator it = q.constraints.begin(),
-                                           itE = q.constraints.end();
-         it != itE; ++it) {
-      auto position = q.constraints.getPositions(it);
+    auto itQueryC = q.constraints.begin();
+    auto itEQueryC = q.constraints.end();
 
-      // Skip if we already used constraints from that position
-      if (activeSolver->usedConstraints.count(position)) {
-        ++reused_cntr;
+    auto itSolverC = activeSolver->usedConstraints.begin();
+    auto itESolverC = activeSolver->usedConstraints.end();
+
+    bool conflicts = false;
+    for (; itQueryC != itEQueryC && itSolverC != itESolverC; ) {
+
+      // TODO access positions directly
+      auto position = q.constraints.getPositions(itQueryC);
+      assert(position.constraint_id && "No position assigned");
+
+      // check if query contains new constraint not added yet
+      if (position < *itSolverC) {
+        if (position.constraint_id > 0) {
+          newlyAddedConstraints.push_back(position);
+        }
+        cm.push_back(*itQueryC);
+        ++itQueryC;
         continue;
       }
 
-      if (position.origin >= 0)
-        newlyAddedConstraints.insert(position);
+      // Check if the constraint in the solver conflicts with this query
+      if (*itSolverC < position) {
+        // for that, check if symbols in the constraint are used in the query
+        for(auto symbol:itSolverC->contained_symbols) {
+          auto a_it = std::lower_bound(used_arrays.begin(), used_arrays.end(), symbol);
+          if (a_it != used_arrays.end() && symbol == *a_it) {
+            conflicts = true;
+            break;
+          }
+        }
+        ++itSolverC;
+      }
 
-      cm.push_back(*it);
+      // Both positions are equal
+      ++reused_cntr;
+      ++itQueryC;
+      ++itSolverC;
+    }
+
+    // handle remaining query items
+    for (; itQueryC != itEQueryC; ++itQueryC ) {
+      // TODO access positions directly
+      auto position = q.constraints.getPositions(itQueryC);
+      assert(position.constraint_id && "No position assigned");
+
+      if (position.constraint_id > 0) {
+        newlyAddedConstraints.push_back(position);
+      }
+      cm.push_back(*itQueryC);
+    }
+
+    // handle remaining solver items
+    for (; itSolverC != itESolverC; ++itSolverC) {
+      // Check if the constraint in the solver conflicts with this query
+      // for that, check if symbols in the constraint are used in the query
+      for(auto symbol:itSolverC->contained_symbols) {
+        auto a_it = std::lower_bound(used_arrays.begin(), used_arrays.end(), symbol);
+        if (a_it != used_arrays.end() && symbol == *a_it) {
+          conflicts = true;
+          break;
+        }
+      }
     }
 
     // In case nothing found, try the next one
-    if (!reused_cntr) {
+    if (!reused_cntr || conflicts) {
       continue;
     }
 
@@ -183,8 +225,12 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
     q.added_constraints = newlyAddedConstraints.size();
     q.solver_id = activeSolver->solver_id;
 
-    activeSolver->usedConstraints.insert(newlyAddedConstraints.begin(),
-                                         newlyAddedConstraints.end());
+    activeSolver->usedConstraints.reserve(activeSolver->usedConstraints.size() + newlyAddedConstraints.size());
+    for(auto new_pos: newlyAddedConstraints) {
+      auto it = std::lower_bound(activeSolver->usedConstraints.begin(),
+          activeSolver->usedConstraints.end(), new_pos, ConstraintPositionLess());
+      activeSolver->usedConstraints.insert(it, new_pos);
+    }
     activeSolver->inactive = 0;
     found_solver = true;
 
@@ -217,19 +263,27 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
 
     // Clear constraints used in previous partial request
     cm.clear();
-    std::unordered_set<ConstraintPosition> newlyAddedConstraints;
+    std::unordered_set<ConstraintPosition, ConstraintPositionHash, ConstraintPositionEqual> newlyAddedConstraints;
     for (ConstraintSetView::const_iterator it = q.constraints.begin(),
                                            itE = q.constraints.end();
          it != itE; ++it) {
       auto position = q.constraints.getPositions(it);
 
-      if (position.origin >= 0)
+      if (position.constraint_id > 0)
         newlyAddedConstraints.insert(position);
 
       cm.push_back(*it);
     }
-    activeSolver->usedConstraints.insert(newlyAddedConstraints.begin(),
-                                         newlyAddedConstraints.end());
+
+    // sorted insert of used constraint positions
+    activeSolver->usedConstraints.reserve(newlyAddedConstraints.size());
+    for (auto new_pos : newlyAddedConstraints) {
+      auto it = std::lower_bound(activeSolver->usedConstraints.begin(),
+                                 activeSolver->usedConstraints.end(), new_pos,
+                                 ConstraintPositionLess());
+      activeSolver->usedConstraints.insert(it, new_pos);
+    }
+
     q.added_constraints = newlyAddedConstraints.size();
     q.solver_id = activeSolver->solver_id;
     activeSolver->inactive = 0;
