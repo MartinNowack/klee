@@ -49,7 +49,7 @@ private:
   ConstraintSetView activeConstraints;
 public:
   IncrementalSolverImpl(Solver *solver)
-      : max_solvers(2), active_solvers(1), activeSolver(nullptr) {
+      : max_solvers(5), active_solvers(1), activeSolver(nullptr) {
     // Add basic core solver
     SolvingState state(solver);
     active_incremental_solvers.push_back(state);
@@ -168,10 +168,33 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
       auto position = q.constraints.getPositions(itQueryC);
       assert(position.constraint_id && "No position assigned");
 
-      // check if query contains new constraint not added yet
-      if (isSmaller(position, *itSolverC)) {
-        newlyAddedConstraints.push_back(position);
-        cm.push_back(*itQueryC);
+      const auto &position_solver = *itSolverC;
+      // Check if query contains new constraint not added yet
+      // We do that in multiple steps:
+      // 1) Check if it is a independent constraint
+      // 2) Is related to the constraint
+
+      if (position.constraint_id < position_solver.constraint_id) {
+        // Check for case 1)
+        if (position.constraint_id < (position_solver.constraint_id -
+                                      position_solver.constraint_width)) {
+          newlyAddedConstraints.push_back(position);
+          cm.push_back(*itQueryC);
+        } else if (position.contained_symbols.size() <
+                   position_solver.contained_symbols.size()) {
+          // Case 2)
+          // We check if the number of symbolics changed
+          // Case 2a) In case they do, we have to add the constraint
+          // as this is the result from some transformation due to
+          // other constraints, they might not be part of this query
+          newlyAddedConstraints.push_back(position);
+          cm.push_back(*itQueryC);
+        } else {
+          // Case 2b) the number of symbolics is the same.
+          // Therefore all constraints which might have been added,
+          // will be part of this query
+          ++reused_cntr;
+        }
         ++itQueryC;
         continue;
       }
