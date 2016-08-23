@@ -170,9 +170,7 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
 
       // check if query contains new constraint not added yet
       if (isSmaller(position, *itSolverC)) {
-        if (position.constraint_id > 0) {
-          newlyAddedConstraints.push_back(position);
-        }
+        newlyAddedConstraints.push_back(position);
         cm.push_back(*itQueryC);
         ++itQueryC;
         continue;
