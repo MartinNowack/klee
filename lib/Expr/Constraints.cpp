@@ -325,17 +325,17 @@ void ConstraintManager::addConstraint(ref<Expr> e) {
   // assign the new space
   ConstraintSetView::next_free_position += count_nodes;
   uint64_t expression_position = ConstraintSetView::next_free_position;
-  llvm::errs() << "Before: ";
-  for (auto i: constraintSetView.origPosition)
-	  llvm::errs() << i.constraint_id << ":" << i.constraint_width << ", ";
+//  llvm::errs() << "Before: ";
+//  for (auto i: constraintSetView.origPosition)
+//	  llvm::errs() << i.constraint_id << ":" << i.constraint_width << ", ";
 
   addConstraintInternal(
       e, ConstraintPosition(expression_position, count_nodes,
                             std::move(countingVisitor.found_symbols)));
-
-  llvm::errs() << "After: ";
-  for (auto i: constraintSetView.origPosition)
-	  llvm::errs() << i.constraint_id << ":" << i.constraint_width << ", ";
+//
+//  llvm::errs() << "After: ";
+//  for (auto i: constraintSetView.origPosition)
+//	  llvm::errs() << i.constraint_id << ":" << i.constraint_width << ", ";
   // shuffle constraints such that they are ordered by origPosition
   auto it = std::is_sorted_until(constraintSetView.origPosition.begin(),
                                  constraintSetView.origPosition.end(), ConstraintPositionLess());
@@ -347,8 +347,8 @@ void ConstraintManager::addConstraint(ref<Expr> e) {
     auto idx_old = it - constraintSetView.origPosition.begin();
     auto idx_new = new_pos - constraintSetView.origPosition.begin();
 
-    llvm::errs() << "POS " << it->constraint_id << " " << idx_new << "\n";
-    llvm::errs() << "IDX " << idx_old << " " << idx_new << "\n";
+//    llvm::errs() << "POS " << it->constraint_id << " " << idx_new << "\n";
+//    llvm::errs() << "IDX " << idx_old << " " << idx_new << "\n";
     constraintSetView.origPosition.insert(new_pos, *it);
     constraintSetView.origPosition.erase(
         constraintSetView.origPosition.begin() + idx_old + 1);
