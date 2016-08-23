@@ -180,6 +180,7 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
           }
         }
         ++itSolverC;
+        continue;
       }
 
       // Both positions are equal
@@ -269,8 +270,7 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
          it != itE; ++it) {
       auto position = q.constraints.getPositions(it);
 
-      if (position.constraint_id > 0)
-        newlyAddedConstraints.insert(position);
+      newlyAddedConstraints.insert(position);
 
       cm.push_back(*it);
     }
