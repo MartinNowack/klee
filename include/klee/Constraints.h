@@ -45,15 +45,6 @@ struct ConstraintPosition {
 
   ConstraintPosition(uint64_t constraint_id_, uint64_t constraint_width_,
                      std::vector<const Array *> &&contained_symbols_);
-  // overloaded < operator
-  bool operator<(const ConstraintPosition &d) {
-    if (constraint_id < d.constraint_id)
-      return true;
-    if (constraint_id == d.constraint_id &&
-        constraint_width < d.constraint_width)
-      return true;
-    return false;
-  }
 };
 }
 

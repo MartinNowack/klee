@@ -311,15 +311,6 @@ void ConstraintSetView::push_back(ref<Expr> e, ConstraintPosition &&positions) {
   origPosition.push_back(std::move(positions));
 }
 
-
-//inline bool operator<(const klee::ConstraintPosition &a, const klee::ConstraintPosition &b) {
-//  if (a.constraint_id < b.constraint_id)
-//    return true;
-//  if (a.constraint_width > b.constraint_width)
-//    return true;
-//  return false;
-//}
-
 void ConstraintManager::addConstraint(ref<Expr> e) {
   TimerStatIncrementer t(stats::addConstraintTime);
 
@@ -347,11 +338,11 @@ void ConstraintManager::addConstraint(ref<Expr> e) {
 	  llvm::errs() << i.constraint_id << ":" << i.constraint_width << ", ";
   // shuffle constraints such that they are ordered by origPosition
   auto it = std::is_sorted_until(constraintSetView.origPosition.begin(),
-                                 constraintSetView.origPosition.end());
+                                 constraintSetView.origPosition.end(), ConstraintPositionLess());
 
   while (it != constraintSetView.origPosition.end()) {
     auto new_pos = std::lower_bound(constraintSetView.origPosition.begin(), it,
-                                    *it, ConstraintPositionEqual());
+                                    *it, ConstraintPositionLess());
 
     auto idx_old = it - constraintSetView.origPosition.begin();
     auto idx_new = new_pos - constraintSetView.origPosition.begin();
@@ -370,7 +361,7 @@ void ConstraintManager::addConstraint(ref<Expr> e) {
 
     // continue checking the remaining array
     it = std::is_sorted_until(constraintSetView.origPosition.begin() + idx_new,
-                              constraintSetView.origPosition.end());
+                              constraintSetView.origPosition.end(), ConstraintPositionLess());
   }
 }
 

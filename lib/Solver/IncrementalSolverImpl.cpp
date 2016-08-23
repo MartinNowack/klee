@@ -111,6 +111,15 @@ protected:
   Query getPartialQuery(const Query &q);
 };
 
+bool isSmaller(const ConstraintPosition & pos1, const ConstraintPosition & pos2) {
+  if (pos1.constraint_id < pos2.constraint_id)
+    return true;
+  if (pos1.constraint_id == pos2.constraint_id &&
+      pos1.constraint_width < pos2.constraint_width)
+    return true;
+  return false;
+}
+
 Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
   // avoid over approximation, if there aren't any constraints,
   // we can't save anything
@@ -160,7 +169,7 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
       assert(position.constraint_id && "No position assigned");
 
       // check if query contains new constraint not added yet
-      if (position < *itSolverC) {
+      if (isSmaller(position, *itSolverC)) {
         if (position.constraint_id > 0) {
           newlyAddedConstraints.push_back(position);
         }
@@ -170,7 +179,7 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
       }
 
       // Check if the constraint in the solver conflicts with this query
-      if (*itSolverC < position) {
+      if (isSmaller(*itSolverC, position)) {
         // for that, check if symbols in the constraint are used in the query
         for(auto symbol:itSolverC->contained_symbols) {
           auto a_it = std::lower_bound(used_arrays.begin(), used_arrays.end(), symbol);
