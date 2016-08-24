@@ -130,7 +130,6 @@ ExecutionState *ExecutionState::branch() {
   ExecutionState *falseState = new ExecutionState(*this);
   falseState->coveredNew = false;
   falseState->coveredLines.clear();
-  falseState->uid = generateStateUid();
 
   weight *= .5;
   falseState->weight -= weight;
