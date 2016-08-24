@@ -120,6 +120,15 @@ namespace klee {
     virtual void clearSolverStack() {
       assert(0 && "Incremental feature not implemented");
     }
+
+    /// Remove solver stack entries
+    ///
+    /// Removes entries from the solver stack
+    /// until index.
+    /// If index is 0, the whole stack is cleared.
+    virtual void popStack(size_t index) {
+      assert(0 && "Incremental feature not implemented");
+    }
 };
 
 }
