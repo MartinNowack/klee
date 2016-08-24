@@ -342,6 +342,10 @@ public:
   bool getIncrementalStatus() override { return incremental; }
 
   void clearSolverStack() override { smem_request->setIncrementalLevel(0); }
+
+  void popStack(size_t newLevel) override {
+	  smem_request->setIncrementalLevel(newLevel);
+  }
 };
 
 /***/

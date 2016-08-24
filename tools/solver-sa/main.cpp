@@ -95,8 +95,8 @@ int main(int argc, char **argv, char **envp) {
       coreSolver->impl->clearSolverStack();
     } else if (request.getIncrementalLevel() <
                std::numeric_limits<uint32_t>::max()) {
-      coreSolver->impl->clearSolverStack();
-      request.setIncrementalLevel(std::numeric_limits<uint32_t>::max());
+      coreSolver->impl->popStack(request.getIncrementalLevel());
+//      request.setIncrementalLevel(std::numeric_limits<uint32_t>::max());
     }
 
     // Acquire query from shared memory
