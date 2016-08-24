@@ -3818,7 +3818,7 @@ bool Executor::getSymbolicSolution(const ExecutionState &state,
                                    &res) {
   solver->setTimeout(coreSolverTimeout);
 
-  solver->solver->impl->clearSolverStack();
+//  solver->solver->impl->clearSolverStack();
 
   ExecutionState tmp(state);
 
