@@ -68,7 +68,7 @@ private:
   double timeout;
   bool useForkedSTP;
   SolverRunStatus runStatusCode;
-  std::vector<size_t> stackIndex;
+  uint64_t stackIndex;
   bool incremental;
 
 public:
@@ -100,7 +100,7 @@ STPSolverImpl::STPSolverImpl(bool _useForkedSTP, bool _optimizeDivides)
     : vc(vc_createValidityChecker()),
       builder(new STPBuilder(vc, _optimizeDivides)), timeout(0.0),
       useForkedSTP(_useForkedSTP), runStatusCode(SOLVER_RUN_STATUS_FAILURE),
-      incremental(false) {
+      stackIndex(0), incremental(false) {
   assert(vc && "unable to create validity checker");
   assert(builder && "unable to create STPBuilder");
 
@@ -160,8 +160,7 @@ char *STPSolverImpl::getConstraintLog(const Query &query) {
   auto emptyConstraints = query.constraints.empty();
   if (!emptyConstraints) {
     vc_push(vc);
-    auto lastIndex = (!stackIndex.empty() ? stackIndex.back() : 0);
-    stackIndex.push_back(lastIndex + query.constraints.size());
+    ++stackIndex;
     for (std::vector<ref<Expr> >::const_iterator it = query.constraints.begin(),
                                                  ie = query.constraints.end();
          it != ie; ++it)
@@ -359,7 +358,7 @@ runAndGetCexForked(::VC vc, STPBuilder *builder, ::VCExpr q,
 bool STPSolverImpl::computeInitialValues(
     const Query &query, const std::vector<const Array *> &objects,
     std::vector<std::vector<unsigned char> > &values, bool &hasSolution) {
-  assert(stackIndex.empty() || incremental);
+  assert(stackIndex == 0 || incremental);
 
   auto success =
       computePartialInitialValues(query, objects, values, hasSolution);
@@ -392,19 +391,14 @@ bool STPSolverImpl::computePartialInitialValues(
 
   bool emptyConstraints = query.constraints.empty();
   if (incremental && !emptyConstraints) {
-    if (stackIndex.empty()) {
-      vc_push(vc);
-      stackIndex.push_back(1);
-    }
+    vc_push(vc);
+    ++stackIndex;
 
     for (ConstraintSetView::const_iterator it = sorted_constraints.begin(),
                                            ie = sorted_constraints.end();
          it != ie; ++it) {
       vc_assertFormula(vc, builder->construct(*it));
     }
-
-    //    auto lastIndex = (!stackIndex.empty() ? stackIndex.back() : 0);
-    //    stackIndex.push_back(lastIndex + query.constraints.size());
   }
   ++stats::queries;
   ++stats::queryCounterexamples;
@@ -451,17 +445,9 @@ bool STPSolverImpl::computePartialInitialValues(
 }
 
 void STPSolverImpl::popStack(size_t index) {
-  if (!stackIndex.empty()) {
+  while (stackIndex-- > index) {
     vc_pop(vc);
-    stackIndex.clear();
   }
-  //  while (!stackIndex.empty()) {
-  //    auto val = stackIndex.back();
-  //    stackIndex.pop_back();
-  //    vc_pop(vc);
-  //    if (val == index)
-  //      return;
-  //  }
 }
 
 SolverImpl::SolverRunStatus STPSolverImpl::getOperationStatusCode() {
