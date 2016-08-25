@@ -173,10 +173,16 @@ char *STPSolverImpl::getConstraintLog(const Query &query) {
   char *buffer;
   unsigned long length;
 
+  // New stack level for the query
   vc_push(vc);
   vc_printQueryStateToBuffer(vc, builder->getFalse(), &buffer, &length, false);
   vc_pop(vc);
 
+  // Remove added constraints
+  if (!incremental && !emptyConstraints) {
+    vc_pop(vc);
+    --stackIndex;
+  }
   return buffer;
 }
 
@@ -445,7 +451,7 @@ bool STPSolverImpl::computePartialInitialValues(
 }
 
 void STPSolverImpl::popStack(size_t index) {
-  while (stackIndex-- > index) {
+  for (;stackIndex > index; -- stackIndex) {
     vc_pop(vc);
   }
 }
