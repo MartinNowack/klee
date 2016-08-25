@@ -455,6 +455,7 @@ bool STPSolverImpl::computePartialInitialValues(
 }
 
 void STPSolverImpl::popStack(size_t index) {
+  assert(index <= stackIndex && "Too big");
   for (;stackIndex > index; -- stackIndex) {
     vc_pop(vc);
   }

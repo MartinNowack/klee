@@ -393,7 +393,7 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
     activeSolver->usedConstraints.reserve(activeSolver->usedConstraints.size() +
                                           newlyAddedConstraints.size());
 
-    if(!newlyAddedConstraints.empty()) {
+    if (!newlyAddedConstraints.empty()) {
       // Add new level to the solver stack
       activeSolver->stackDepth = leastConflictingLevel + 1;
       for (auto new_pos : newlyAddedConstraints) {
@@ -403,7 +403,7 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
         activeSolver->insertLevel.insert(
             activeSolver->insertLevel.begin() +
                 (it - activeSolver->usedConstraints.begin()),
-                activeSolver->stackDepth);
+            activeSolver->stackDepth);
         activeSolver->usedConstraints.insert(it, new_pos);
       }
     } else {
@@ -412,11 +412,13 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
     }
     activeSolver->inactive = 0;
     activeSolver->solver->impl->popStack(leastConflictingLevel);
-  }
+    // We found one existing solver, update stats
+    ++stats::queryIncremental;
+    q.incremental_flag = true;
+  } else {
+    // If we didn't find a solver yet, two options: add a new one or use an
+    // existing one
 
-  // If we didn't find a solver yet, two options: add a new one or use an
-  // existing one
-  if (!leastConflictingLevel || !pos) {
     // Check if we still have space for a new solver
     if (active_solvers < max_solvers) {
       // Yes, use the next free solver
@@ -459,16 +461,17 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
       // Initialize leve with 1;
       activeSolver->insertLevel.push_back(1);
     }
-    ++activeSolver->stackDepth;
+    activeSolver->stackDepth = 1;
 
     q.added_constraints = newlyAddedConstraints.size();
     q.solver_id = activeSolver->solver_id;
     activeSolver->inactive = 0;
-    activeSolver->solver->impl->popStack(leastConflictingLevel);
-  } else {
-    // We found one existing solver, update stats
-    ++stats::queryIncremental;
-    q.incremental_flag = true;
+    activeSolver->solver->impl->popStack(0);
+  }
+
+  if (q.constraints.size() != q.added_constraints + q.reused_cntr) {
+    q.dump();
+    assert(0 && "Wrong size");
   }
 
   auto res = Query(activeConstraints, q.expr, q.queryOrigin);
