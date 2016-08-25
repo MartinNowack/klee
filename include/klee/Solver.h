@@ -54,9 +54,20 @@ class ConstraintSetView;
 
     /// Query stats
     mutable bool incremental_flag;
+
+    /// Number of reused constraints
     mutable size_t reused_cntr;
+
+    /// Number of overall constraints on the solver side
+    /// This include additional constraints which are not used
+    /// in case of incremental solving but still are part of the
+    /// solver state.
     mutable size_t query_size;
+
+    /// Newly added constraints
     mutable size_t added_constraints;
+
+    /// ID of the solver
     mutable size_t solver_id;
   };
 
