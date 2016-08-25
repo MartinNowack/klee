@@ -25,11 +25,12 @@ struct SolvingState {
 
   // Track level of insertion
   std::vector<uint64_t> insertLevel;
+  size_t stackDepth;
   size_t inactive;
   size_t solver_id;
   SolvingState(Solver *solver_)
       : solver(static_cast<ClientProcessAdapterSolver *>(solver_)),
-        inactive(0), solver_id(0) {}
+        stackDepth(0), inactive(0), solver_id(0) {}
 };
 
 class IncrementalSolverImpl : public SolverImpl {
@@ -48,6 +49,7 @@ private:
 
   // Used for any query during solving
   ConstraintSetView activeConstraints;
+
 public:
   IncrementalSolverImpl(Solver *solver)
       : max_solvers(5), active_solvers(0), activeSolver(nullptr) {
@@ -111,11 +113,11 @@ public:
 
 protected:
   Query getPartialQuery(const Query &q);
-  size_t selectBestSolver(const Query &q, size_t & non_conflict_level, size_t & reused_constraints, size_t & max_inactive );
-
+  size_t selectBestSolver(const Query &q, size_t &non_conflict_level,
+                          size_t &reused_constraints, size_t &max_inactive);
 };
 
-bool isSmaller(const ConstraintPosition & pos1, const ConstraintPosition & pos2) {
+bool isSmaller(const ConstraintPosition &pos1, const ConstraintPosition &pos2) {
   if (pos1.constraint_id < pos2.constraint_id)
     return true;
   if (pos1.constraint_id == pos2.constraint_id &&
@@ -124,14 +126,15 @@ bool isSmaller(const ConstraintPosition & pos1, const ConstraintPosition & pos2)
   return false;
 }
 
-
-
-size_t IncrementalSolverImpl::selectBestSolver(const Query &q, size_t & non_conflict_level, size_t & reused_constraints, size_t & max_inactive) {
+size_t IncrementalSolverImpl::selectBestSolver(const Query &q,
+                                               size_t &non_conflict_level,
+                                               size_t &reused_constraints,
+                                               size_t &max_inactive) {
   // Handle available stack of solvers
   auto use_solver_index = active_solvers - 1;
   activeSolver = &active_incremental_solvers.back();
 
-  std::vector<const Array*> used_arrays = q.constraints.getUsedArrays();
+  std::vector<const Array *> used_arrays = q.constraints.getUsedArrays();
 
   // Check the incremental solvers
   std::vector<size_t> conflictingLevels(active_solvers);
@@ -140,7 +143,8 @@ size_t IncrementalSolverImpl::selectBestSolver(const Query &q, size_t & non_conf
 
   while (use_solver_index > 0) {
     activeSolver = &active_incremental_solvers[use_solver_index--];
-    assert(activeSolver != &active_incremental_solvers[0] && "Don't use the non-incremental solver");
+    assert(activeSolver != &active_incremental_solvers[0] &&
+           "Don't use the non-incremental solver");
 
     // Update poor man's caching tracking
     max_inactive = std::max(++(activeSolver->inactive), max_inactive);
@@ -153,12 +157,11 @@ size_t IncrementalSolverImpl::selectBestSolver(const Query &q, size_t & non_conf
 
     auto itSolverC = activeSolver->usedConstraints.begin();
     auto itESolverC = activeSolver->usedConstraints.end();
-    auto conflictingLevel = activeSolver->insertLevel.size();
+    auto conflictingLevel = activeSolver->stackDepth;
 
     std::vector<size_t> constrain_levels;
 
-    for (; itQueryC != itEQueryC && itSolverC != itESolverC; ) {
-
+    for (; itQueryC != itEQueryC && itSolverC != itESolverC;) {
       // TODO access positions directly
       auto position = q.constraints.getPositions(itQueryC);
       assert(position.constraint_id && "No position assigned");
@@ -181,10 +184,14 @@ size_t IncrementalSolverImpl::selectBestSolver(const Query &q, size_t & non_conf
           // as this is the result from some transformation due to
           // other constraints, they might not be part of this query
         } else {
+          assert(position.contained_symbols.size() ==
+                 position_solver.contained_symbols.size());
           // Case 2b) the number of symbolics is the same.
           // Therefore all constraints which might have been added,
           // will be part of this query
-          constrain_levels.push_back(activeSolver->insertLevel[itSolverC - activeSolver->usedConstraints.begin()]);
+          constrain_levels.push_back(
+              activeSolver->insertLevel[itSolverC -
+                                        activeSolver->usedConstraints.begin()]);
         }
         ++itQueryC;
         continue;
@@ -193,47 +200,64 @@ size_t IncrementalSolverImpl::selectBestSolver(const Query &q, size_t & non_conf
       // Check if the constraint in the solver conflicts with this query
       if (isSmaller(*itSolverC, position)) {
         // for that, check if symbols in the constraint are used in the query
-        for(auto symbol:itSolverC->contained_symbols) {
-          auto a_it = std::lower_bound(used_arrays.begin(), used_arrays.end(), symbol);
+        for (auto symbol : itSolverC->contained_symbols) {
+          auto a_it =
+              std::lower_bound(used_arrays.begin(), used_arrays.end(), symbol);
           if (a_it != used_arrays.end() && symbol == *a_it) {
-            conflictingLevel = std::min(conflictingLevel, activeSolver->insertLevel[itSolverC - activeSolver->usedConstraints.begin()] - 1);
+
+            conflictingLevel = std::min(
+                conflictingLevel,
+                activeSolver
+                        ->insertLevel[itSolverC -
+                                      activeSolver->usedConstraints.begin()] -
+                    1);
           }
         }
         ++itSolverC;
         continue;
       }
 
-      constrain_levels.push_back(activeSolver->insertLevel[itSolverC - activeSolver->usedConstraints.begin()]);
+      constrain_levels.push_back(
+          activeSolver
+              ->insertLevel[itSolverC - activeSolver->usedConstraints.begin()]);
       ++itQueryC;
       ++itSolverC;
     }
 
     // handle remaining query items
-    for (; itQueryC != itEQueryC; ++itQueryC ){ }
+    for (; itQueryC != itEQueryC; ++itQueryC) {
+    }
 
     // handle remaining solver items
     for (; itSolverC != itESolverC; ++itSolverC) {
       // Check if the constraint in the solver conflicts with this query
       // for that, check if symbols in the constraint are used in the query
-      for(auto symbol:itSolverC->contained_symbols) {
-        auto a_it = std::lower_bound(used_arrays.begin(), used_arrays.end(), symbol);
+      for (auto symbol : itSolverC->contained_symbols) {
+        auto a_it =
+            std::lower_bound(used_arrays.begin(), used_arrays.end(), symbol);
         if (a_it != used_arrays.end() && symbol == *a_it) {
-          conflictingLevel = std::min(conflictingLevel, activeSolver->insertLevel[itSolverC - activeSolver->usedConstraints.begin()]-1);
+          conflictingLevel = std::min(
+              conflictingLevel,
+              activeSolver->insertLevel[itSolverC -
+                                        activeSolver->usedConstraints.begin()] -
+                  1);
         }
       }
     }
 
-    conflictingLevels[use_solver_index+1] = conflictingLevel;
-    reuseCounters[use_solver_index+1] = std::count_if(constrain_levels.begin(), constrain_levels.end(),
-        [&] (size_t i) { return (i <= conflictingLevel); });
+    conflictingLevels[use_solver_index + 1] = conflictingLevel;
+    reuseCounters[use_solver_index + 1] =
+        std::count_if(constrain_levels.begin(), constrain_levels.end(),
+                      [&](size_t i) { return (i <= conflictingLevel); });
   }
 
   // now, find the maximum reuse level here:
-  auto max_reuse_it = std::max_element(reuseCounters.begin(), reuseCounters.end());
+  auto max_reuse_it =
+      std::max_element(reuseCounters.begin(), reuseCounters.end());
   auto solver_index = max_reuse_it - reuseCounters.begin();
 
   reused_constraints = *max_reuse_it;
-  non_conflict_level= conflictingLevels[solver_index];
+  non_conflict_level = conflictingLevels[solver_index];
 
   // If no reuse is possible, select any solver
   if (!reused_constraints) {
@@ -254,7 +278,7 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
   SimpleConstraintManager cm(activeConstraints);
   std::vector<ConstraintPosition> newlyAddedConstraints;
 
-  std::vector<const Array*> used_arrays = q.constraints.getUsedArrays();
+  std::vector<const Array *> used_arrays = q.constraints.getUsedArrays();
 
   // Check the incremental solvers
   size_t max_inactive = 0;
@@ -279,10 +303,12 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
 
     auto itSolverC = activeSolver->usedConstraints.begin();
     auto itESolverC = activeSolver->usedConstraints.end();
-    auto conflictingLevel = activeSolver->insertLevel.size();
+    //    auto conflictingLevel = activeSolver->insertLevel.size();
 
-    for (; itQueryC != itEQueryC && itSolverC != itESolverC; ) {
-      auto constraintStackLevel = activeSolver->insertLevel[itSolverC - activeSolver->usedConstraints.begin()];
+    for (; itQueryC != itEQueryC && itSolverC != itESolverC;) {
+      auto constraintStackLevel =
+          activeSolver
+              ->insertLevel[itSolverC - activeSolver->usedConstraints.begin()];
 
       // TODO access positions directly
       auto position = q.constraints.getPositions(itQueryC);
@@ -301,8 +327,8 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
           newlyAddedConstraints.push_back(position);
           cm.push_back(*itQueryC);
         } else if (position.contained_symbols.size() <
-                   position_solver.contained_symbols.size()
-                   || constraintStackLevel > conflictingLevel) {
+                       position_solver.contained_symbols.size() ||
+                   constraintStackLevel > leastConflictingLevel) {
           // Case 2)
           // We check if the number of symbolics changed
           // Case 2a) In case they do, we have to add the constraint
@@ -331,7 +357,7 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
     }
 
     // handle remaining query items
-    for (; itQueryC != itEQueryC; ++itQueryC ) {
+    for (; itQueryC != itEQueryC; ++itQueryC) {
       // TODO access positions directly
       auto position = q.constraints.getPositions(itQueryC);
       assert(position.constraint_id && "No position assigned");
@@ -348,28 +374,41 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
     q.solver_id = activeSolver->solver_id;
 
     // Clean up previous levels
-    for (auto it = activeSolver->insertLevel.begin(); it != activeSolver->insertLevel.end(); ) {
-	// Delete level
-	if (*it <= leastConflictingLevel) {
-		it++;
-		continue;
-	}
-	// As we delete elements, we use indices
-	// to update the iterators
-	auto index = it - activeSolver->insertLevel.begin();
-	activeSolver->insertLevel.erase(it);
-	activeSolver->usedConstraints.erase(activeSolver->usedConstraints.begin() + index);
-	it = activeSolver->insertLevel.begin() + index;
+    for (auto it = activeSolver->insertLevel.begin();
+         it != activeSolver->insertLevel.end();) {
+      // Delete level
+      if (*it <= leastConflictingLevel) {
+        it++;
+        continue;
+      }
+      // As we delete elements, we use indices
+      // to update the iterators
+      auto index = it - activeSolver->insertLevel.begin();
+      activeSolver->insertLevel.erase(it);
+      activeSolver->usedConstraints.erase(
+          activeSolver->usedConstraints.begin() + index);
+      it = activeSolver->insertLevel.begin() + index;
     }
 
-    activeSolver->usedConstraints.reserve(activeSolver->usedConstraints.size() + newlyAddedConstraints.size());
-    uint64_t solverLevel = activeSolver->insertLevel.size();
+    activeSolver->usedConstraints.reserve(activeSolver->usedConstraints.size() +
+                                          newlyAddedConstraints.size());
 
-    for(auto new_pos: newlyAddedConstraints) {
-      auto it = std::lower_bound(activeSolver->usedConstraints.begin(),
-          activeSolver->usedConstraints.end(), new_pos, ConstraintPositionLess());
-      activeSolver->insertLevel.insert(activeSolver->insertLevel.begin() + (it - activeSolver->usedConstraints.begin()), solverLevel);
-      activeSolver->usedConstraints.insert(it, new_pos);
+    if(!newlyAddedConstraints.empty()) {
+      // Add new level to the solver stack
+      activeSolver->stackDepth = leastConflictingLevel + 1;
+      for (auto new_pos : newlyAddedConstraints) {
+        auto it = std::lower_bound(activeSolver->usedConstraints.begin(),
+                                   activeSolver->usedConstraints.end(), new_pos,
+                                   ConstraintPositionLess());
+        activeSolver->insertLevel.insert(
+            activeSolver->insertLevel.begin() +
+                (it - activeSolver->usedConstraints.begin()),
+                activeSolver->stackDepth);
+        activeSolver->usedConstraints.insert(it, new_pos);
+      }
+    } else {
+      // just reset to the least conflicting level
+      activeSolver->stackDepth = leastConflictingLevel;
     }
     activeSolver->inactive = 0;
     activeSolver->solver->impl->popStack(leastConflictingLevel);
@@ -397,7 +436,8 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
 
     // Clear constraints used in previous partial request
     cm.clear();
-    std::unordered_set<ConstraintPosition, ConstraintPositionHash, ConstraintPositionEqual> newlyAddedConstraints;
+    std::unordered_set<ConstraintPosition, ConstraintPositionHash,
+                       ConstraintPositionEqual> newlyAddedConstraints;
     for (ConstraintSetView::const_iterator it = q.constraints.begin(),
                                            itE = q.constraints.end();
          it != itE; ++it) {
@@ -419,6 +459,7 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
       // Initialize leve with 1;
       activeSolver->insertLevel.push_back(1);
     }
+    ++activeSolver->stackDepth;
 
     q.added_constraints = newlyAddedConstraints.size();
     q.solver_id = activeSolver->solver_id;
