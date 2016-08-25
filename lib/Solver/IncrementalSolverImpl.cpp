@@ -111,7 +111,7 @@ public:
 
 protected:
   Query getPartialQuery(const Query &q);
-  size_t selectBestSolver(const Query &q, size_t & level, size_t & reused);
+  size_t selectBestSolver(const Query &q, size_t & non_conflict_level, size_t & reused_constraints, size_t & max_inactive );
 
 };
 
@@ -126,7 +126,7 @@ bool isSmaller(const ConstraintPosition & pos1, const ConstraintPosition & pos2)
 
 
 
-size_t IncrementalSolverImpl::selectBestSolver(const Query &q, size_t & level, size_t & reused) {
+size_t IncrementalSolverImpl::selectBestSolver(const Query &q, size_t & non_conflict_level, size_t & reused_constraints, size_t & max_inactive) {
   // Handle available stack of solvers
   auto use_solver_index = active_solvers - 1;
   activeSolver = &active_incremental_solvers.back();
@@ -134,8 +134,6 @@ size_t IncrementalSolverImpl::selectBestSolver(const Query &q, size_t & level, s
   std::vector<const Array*> used_arrays = q.constraints.getUsedArrays();
 
   // Check the incremental solvers
-  size_t max_inactive = 0;
-
   std::vector<size_t> conflictingLevels(active_solvers);
   std::vector<size_t> reuseCounters(active_solvers);
 
@@ -231,13 +229,18 @@ size_t IncrementalSolverImpl::selectBestSolver(const Query &q, size_t & level, s
   }
 
   // now, find the maximum reuse level here:
-  auto pos = std::max_element(reuseCounters.begin(), reuseCounters.end());
-  auto index = pos - reuseCounters.begin();
+  auto max_reuse_it = std::max_element(reuseCounters.begin(), reuseCounters.end());
+  auto solver_index = max_reuse_it - reuseCounters.begin();
 
-  reused = *pos;
-  level= conflictingLevels[index];
+  reused_constraints = *max_reuse_it;
+  non_conflict_level= conflictingLevels[solver_index];
 
-  return index;
+  // If no reuse is possible, select any solver
+  if (!reused_constraints) {
+    solver_index = 0;
+
+  }
+  return solver_index;
 }
 
 Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
@@ -258,7 +261,7 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
 
   size_t leastConflictingLevel = 0;
   size_t reuse = 0;
-  auto pos = selectBestSolver(q, leastConflictingLevel, reuse);
+  auto pos = selectBestSolver(q, leastConflictingLevel, reuse, max_inactive);
 
   if (leastConflictingLevel && pos) {
     activeSolver = &active_incremental_solvers[pos];
