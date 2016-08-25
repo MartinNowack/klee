@@ -186,7 +186,7 @@ size_t IncrementalSolverImpl::selectBestSolver(const Query &q, size_t & level, s
           // Case 2b) the number of symbolics is the same.
           // Therefore all constraints which might have been added,
           // will be part of this query
-          constrain_levels.push_back(activeSolver->insertLevel[activeSolver->usedConstraints.begin() - itSolverC]);
+          constrain_levels.push_back(activeSolver->insertLevel[itSolverC - activeSolver->usedConstraints.begin()]);
         }
         ++itQueryC;
         continue;
@@ -198,13 +198,14 @@ size_t IncrementalSolverImpl::selectBestSolver(const Query &q, size_t & level, s
         for(auto symbol:itSolverC->contained_symbols) {
           auto a_it = std::lower_bound(used_arrays.begin(), used_arrays.end(), symbol);
           if (a_it != used_arrays.end() && symbol == *a_it) {
-            conflictingLevel = std::min(conflictingLevel, activeSolver->insertLevel[activeSolver->usedConstraints.begin() - itSolverC]-1);
+            conflictingLevel = std::min(conflictingLevel, activeSolver->insertLevel[itSolverC - activeSolver->usedConstraints.begin()] - 1);
           }
         }
         ++itSolverC;
         continue;
       }
 
+      constrain_levels.push_back(activeSolver->insertLevel[itSolverC - activeSolver->usedConstraints.begin()]);
       ++itQueryC;
       ++itSolverC;
     }
@@ -219,7 +220,7 @@ size_t IncrementalSolverImpl::selectBestSolver(const Query &q, size_t & level, s
       for(auto symbol:itSolverC->contained_symbols) {
         auto a_it = std::lower_bound(used_arrays.begin(), used_arrays.end(), symbol);
         if (a_it != used_arrays.end() && symbol == *a_it) {
-          conflictingLevel = std::min(conflictingLevel, activeSolver->insertLevel[activeSolver->usedConstraints.begin() - itSolverC]-1);
+          conflictingLevel = std::min(conflictingLevel, activeSolver->insertLevel[itSolverC - activeSolver->usedConstraints.begin()]-1);
         }
       }
     }
@@ -278,7 +279,7 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
     auto conflictingLevel = activeSolver->insertLevel.size();
 
     for (; itQueryC != itEQueryC && itSolverC != itESolverC; ) {
-      auto constraintLevel = activeSolver->insertLevel[activeSolver->usedConstraints.begin() - itSolverC];
+      auto constraintStackLevel = activeSolver->insertLevel[itSolverC - activeSolver->usedConstraints.begin()];
 
       // TODO access positions directly
       auto position = q.constraints.getPositions(itQueryC);
@@ -298,7 +299,7 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
           cm.push_back(*itQueryC);
         } else if (position.contained_symbols.size() <
                    position_solver.contained_symbols.size()
-                   || constraintLevel > conflictingLevel) {
+                   || constraintStackLevel > conflictingLevel) {
           // Case 2)
           // We check if the number of symbolics changed
           // Case 2a) In case they do, we have to add the constraint
