@@ -50,16 +50,18 @@ private:
   ConstraintSetView activeConstraints;
 public:
   IncrementalSolverImpl(Solver *solver)
-      : max_solvers(5), active_solvers(1), activeSolver(nullptr) {
+      : max_solvers(5), active_solvers(0), activeSolver(nullptr) {
     // Add basic core solver
     SolvingState state(solver);
     active_incremental_solvers.push_back(state);
     std::unique_ptr<ClientProcessAdapterSolver> ptr(
         static_cast<ClientProcessAdapterSolver *>(solver));
     solvers.push_back(std::move(ptr));
+
     // the base solver should not be incremental
     solver->impl->setIncrementalStatus(false);
     activeSolver = &active_incremental_solvers[0];
+    ++active_solvers;
 
     // Create and add additional solvers
     for (size_t i = 1; i < max_solvers; ++i) {
@@ -140,6 +142,7 @@ size_t IncrementalSolverImpl::selectBestSolver(const Query &q, size_t & level, s
 
   while (use_solver_index > 0) {
     activeSolver = &active_incremental_solvers[use_solver_index--];
+    assert(activeSolver != &active_incremental_solvers[0] && "Don't use the non-incremental solver");
 
     // Update poor man's caching tracking
     max_inactive = std::max(++(activeSolver->inactive), max_inactive);
@@ -255,10 +258,10 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
   size_t leastConflictingLevel = 0;
   size_t reuse = 0;
   auto pos = selectBestSolver(q, leastConflictingLevel, reuse);
-  assert(pos && "First solver selected");
-  activeSolver = &active_incremental_solvers[pos];
 
-  if (leastConflictingLevel) {
+  if (leastConflictingLevel && pos) {
+    activeSolver = &active_incremental_solvers[pos];
+
     // Prepare constraint manager
     // Clear constraints used in previous partial request
     cm.clear();
@@ -370,7 +373,7 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
 
   // If we didn't find a solver yet, two options: add a new one or use an
   // existing one
-  if (!leastConflictingLevel) {
+  if (!leastConflictingLevel || !pos) {
     // Check if we still have space for a new solver
     if (active_solvers < max_solvers) {
       // Yes, use the next free solver
