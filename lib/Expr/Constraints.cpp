@@ -173,6 +173,13 @@ ConstraintPosition::ConstraintPosition(uint64_t constraint_id_, uint64_t constra
   contained_symbols(std::move(contained_symbols_)){}
 
 
+void ConstraintPosition::dump() const {
+  llvm::errs() << "(" << constraint_id << ":" << constraint_width << ")[";
+  for (auto sym: contained_symbols)
+    llvm::errs() << sym->name << ",";
+  llvm::errs() << "]\n";
+}
+
 //bool ConstraintPosition::operator==(const ConstraintPosition &pos) const {
 //  // XXX CHECK
 //  return (constraint_id == pos.constraint_id &&
