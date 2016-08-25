@@ -45,6 +45,7 @@ struct ConstraintPosition {
 
   ConstraintPosition(uint64_t constraint_id_, uint64_t constraint_width_,
                      std::vector<const Array *> &&contained_symbols_);
+  void dump() const;
 };
 }
 
