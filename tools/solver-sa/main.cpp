@@ -50,7 +50,7 @@ int main(int argc, char **argv, char **envp) {
                                               &cache, /* forked solver*/ false);
 
   auto solver = coreSolver;
-//  solver = createPCLoggingSolver(solver, "/tmp/test.pc", 0);
+  // solver = createPCLoggingSolver(solver, "/tmp/test_"+std::string(argv[1])+".pc", 0);
 
   // Take the ID from the first argument
   SharedMem request(SharedMem::defaultSize, std::string(argv[1]) + "_request");
