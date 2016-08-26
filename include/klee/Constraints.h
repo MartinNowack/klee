@@ -31,7 +31,6 @@ class SimpleConstraintManager;
 class ReferencingConstraintManager;
 class Expr;
 
-
 struct ConstraintPosition {
   // Unique ID of the constraint
   uint64_t constraint_id;
@@ -40,10 +39,14 @@ struct ConstraintPosition {
   // number of nodes
   uint64_t constraint_width;
 
+  // Version of constraint position
+  uint64_t version;
+
   // Cache of contained symbols inside the constraints
   std::vector<const Array *> contained_symbols;
 
   ConstraintPosition(uint64_t constraint_id_, uint64_t constraint_width_,
+                     uint64_t version,
                      std::vector<const Array *> &&contained_symbols_);
   void dump() const;
 };
@@ -118,7 +121,6 @@ private:
   static uint64_t next_free_position;
   static uint64_t version_cntr;
 
-
   // Tracks origin position for each set
   // First: the origin position, second unique id
   std::vector<ConstraintPosition> origPosition;
@@ -126,7 +128,7 @@ private:
 public:
   ConstraintPosition getPositions(const_iterator it) const;
 
-  std::vector<const Array*> getUsedArrays() const;
+  std::vector<const Array *> getUsedArrays() const;
 };
 
 /**
