@@ -217,9 +217,20 @@ size_t IncrementalSolverImpl::selectBestSolver(const Query &q,
         continue;
       }
 
-      constrain_levels.push_back(
-          activeSolver
-              ->insertLevel[itSolverC - activeSolver->usedConstraints.begin()]);
+      if (position.version != position_solver.version) {
+        // XXX with a different version, we currently assume
+        // even everything else equal, this will conflict
+        conflictingLevel = std::min(
+            conflictingLevel,
+            activeSolver->insertLevel[itSolverC -
+                                      activeSolver->usedConstraints.begin()] -
+                1);
+
+      } else {
+        constrain_levels.push_back(
+            activeSolver->insertLevel[itSolverC -
+                                      activeSolver->usedConstraints.begin()]);
+      }
       ++itQueryC;
       ++itSolverC;
     }
@@ -277,8 +288,6 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
 
   SimpleConstraintManager cm(activeConstraints);
   std::vector<ConstraintPosition> newlyAddedConstraints;
-
-  std::vector<const Array *> used_arrays = q.constraints.getUsedArrays();
 
   // Check the incremental solvers
   size_t max_inactive = 0;
