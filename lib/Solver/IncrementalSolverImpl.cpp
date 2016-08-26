@@ -174,8 +174,8 @@ size_t IncrementalSolverImpl::selectBestSolver(const Query &q,
 
       if (position.constraint_id < position_solver.constraint_id) {
         // Check for case 1)
-        if (position.constraint_id < (position_solver.constraint_id -
-                                      position_solver.constraint_width)) {
+        if (position.constraint_id <= (position_solver.constraint_id -
+                                       position_solver.constraint_width)) {
         } else if (position.contained_symbols.size() <
                    position_solver.contained_symbols.size()) {
           // Case 2)
@@ -322,8 +322,8 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
 
       if (position.constraint_id < position_solver.constraint_id) {
         // Check for case 1)
-        if (position.constraint_id < (position_solver.constraint_id -
-                                      position_solver.constraint_width)) {
+        if (position.constraint_id <= (position_solver.constraint_id -
+                                       position_solver.constraint_width)) {
           newlyAddedConstraints.push_back(position);
           cm.push_back(*itQueryC);
         } else if (position.contained_symbols.size() <
