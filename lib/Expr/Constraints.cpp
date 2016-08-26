@@ -169,7 +169,7 @@ ConstraintPosition::ConstraintPosition(
     uint64_t constraint_id_, uint64_t constraint_width_, uint64_t version_,
     std::vector<const Array *> &&contained_symbols_)
     : constraint_id(constraint_id_), constraint_width(constraint_width_),
-      contained_symbols(std::move(contained_symbols_)), version(version_) {}
+      version(version_), contained_symbols(std::move(contained_symbols_)) {}
 
 void ConstraintPosition::dump() const {
   llvm::errs() << "(" << constraint_id << ":" << constraint_width << ")[";
