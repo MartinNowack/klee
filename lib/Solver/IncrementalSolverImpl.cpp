@@ -352,6 +352,11 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
       }
 
       // Both positions are equal
+      // Still, they might have to be added, if they will be removed
+      if (constraintStackLevel > leastConflictingLevel) {
+        newlyAddedConstraints.push_back(position);
+        cm.push_back(*itQueryC);
+      }
       ++itQueryC;
       ++itSolverC;
     }
