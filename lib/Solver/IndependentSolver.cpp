@@ -207,7 +207,7 @@ public:
 
   // returns true iff set is changed by addition
   bool add(const IndependentElementSet &b) {
-    ReferencingConstraintManager mng(exprs, b.exprs);
+    SimpleConstraintManager mng(exprs);
     for (ConstraintSetView::const_iterator i = b.exprs.begin(),
                                            iE = b.exprs.end();
          i != iE; ++i) {
