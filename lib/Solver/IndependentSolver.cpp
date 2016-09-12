@@ -108,7 +108,7 @@ public:
              // be invoked.
 
   IndependentElementSet() = delete;
-  IndependentElementSet(ref<Expr> e, const ConstraintSetView &origView) {
+  IndependentElementSet(ref<Expr> e) {
     SimpleConstraintManager(exprs).push_back_nontracking(e);
     // Track all reads in the program.  Determines whether reads are
     // concrete or symbolic.  If they are symbolic, "collapses" array
@@ -269,7 +269,7 @@ getAllIndependentConstraintsSets(const Query &query,
                                   "therefore not included in factors");
   } else {
     ref<Expr> neg = Expr::createIsZero(query.expr);
-    factors.push_back(IndependentElementSet(neg, query.constraints));
+    factors.push_back(IndependentElementSet(neg));
   }
 
   for (ConstraintSetView::const_iterator it = query.constraints.begin(),
@@ -280,7 +280,7 @@ getAllIndependentConstraintsSets(const Query &query,
     // evaluated.  If the queue property isn't maintained, then the exprs
     // could be returned in an order different from how they came in, negatively
     // affecting later stages.
-    factors.push_back(IndependentElementSet(*it, query.constraints));
+    factors.push_back(IndependentElementSet(*it));
   }
 
   bool doneLoop = false;
@@ -316,7 +316,7 @@ getAllIndependentConstraintsSets(const Query &query,
 
 static void getIndependentConstraints(const Query &query,
                                       ConstraintSetView &resultView) {
-  IndependentElementSet eltsClosure(query.expr, query.constraints);
+  IndependentElementSet eltsClosure(query.expr);
   ReferencingConstraintManager result(resultView, query.constraints);
   std::vector< std::pair<ref<Expr>, IndependentElementSet> > worklist;
 
@@ -324,7 +324,7 @@ static void getIndependentConstraints(const Query &query,
                                          ie = query.constraints.end();
        it != ie; ++it)
     worklist.push_back(
-        std::make_pair(*it, IndependentElementSet(*it, query.constraints)));
+        std::make_pair(*it, IndependentElementSet(*it)));
 
   // XXX This should be more efficient (in terms of low level copy stuff).
   bool done = false;
@@ -351,7 +351,7 @@ static void getIndependentConstraints(const Query &query,
       std::set<ref<Expr> > reqset(resultView.begin(), resultView.end());
       errs() << "--\n"; errs() << "Q: " << query.expr << "\n";
       errs() << "\telts: "
-             << IndependentElementSet(query.expr, query.constraints) << "\n";
+             << IndependentElementSet(query.expr) << "\n";
       int i = 0; for (ConstraintSetView::const_iterator it =
                           query.constraints.begin(),
                       ie = query.constraints.end();
@@ -359,7 +359,7 @@ static void getIndependentConstraints(const Query &query,
         errs() << "C" << i++ << ": " << *it;
         errs() << " " << (reqset.count(*it) ? "(required)" : "(independent)")
                << "\n";
-        errs() << "\telts: " << IndependentElementSet(*it, query.constraints)
+        errs() << "\telts: " << IndependentElementSet(*it)
                << "\n";
       } errs() << "elts closure: "
                << eltsClosure << "\n";);
