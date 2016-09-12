@@ -127,6 +127,7 @@ private:
 
 public:
   ConstraintPosition getPositions(const_iterator it) const;
+  ConstraintPosition getPositions(size_t pos) const;
 
   std::vector<const Array *> getUsedArrays() const;
 };
