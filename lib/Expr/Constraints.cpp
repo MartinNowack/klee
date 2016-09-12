@@ -46,6 +46,7 @@ uint64_t ConstraintSetView::version_cntr = 1;
 void ConstraintSetView::extractAndResetConstraints(ConstraintSetView &other) {
   constraints.swap(other.constraints);
   origPosition.swap(other.origPosition);
+  std::swap(trackPos, other.trackPos);
   //  deletedPositions.swap(other.deletedPositions);
   //  std::swap(uid_cntr, other.uid_cntr);
   //  std::swap(next_free_position, other.next_free_position);
@@ -311,16 +312,26 @@ void ConstraintManager::addConstraintInternal(ref<Expr> e,
 }
 
 ConstraintPosition ConstraintSetView::getPositions(const_iterator it) const {
+  assert(trackPos || constraints.empty());
   return origPosition[it - constraints.begin()];
 }
 
 ConstraintPosition ConstraintSetView::getPositions(size_t pos) const {
+  assert(trackPos || constraints.empty());
   return origPosition[pos];
 }
 
 void ConstraintSetView::push_back(ref<Expr> e, ConstraintPosition &&positions) {
+  assert(trackPos || constraints.empty());
+  trackPos = true;
   constraints.push_back(e);
   origPosition.push_back(std::move(positions));
+}
+
+void ConstraintSetView::push_nontracking(ref<Expr> e) {
+  assert(!trackPos || origPosition.empty());
+  trackPos = false;
+  constraints.push_back(e);
 }
 
 void ConstraintManager::addConstraint(ref<Expr> e) {
@@ -369,8 +380,13 @@ void ConstraintManager::addConstraint(ref<Expr> e) {
 void SimpleConstraintManager::push_back(ref<Expr> expr) {
   // We explicitly initialize the constraint position to 0
   // this should not be used to track constraints
-  constraintSetView.push_back(
-      expr, ConstraintPosition(0, 0, 0, std::vector<const Array *>()));
+  constraintSetView.push_back(expr, ConstraintPosition(0, 0, 0, std::vector<const Array *>()));
+}
+
+void SimpleConstraintManager::push_back_nontracking(ref<Expr> expr) {
+  // We explicitly initialize the constraint position to 0
+  // this should not be used to track constraints
+  constraintSetView.push_nontracking(expr);
 }
 
 void ReferencingConstraintManager::push_back(ref<Expr> expr) {
