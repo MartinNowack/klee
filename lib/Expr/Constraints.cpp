@@ -314,6 +314,10 @@ ConstraintPosition ConstraintSetView::getPositions(const_iterator it) const {
   return origPosition[it - constraints.begin()];
 }
 
+ConstraintPosition ConstraintSetView::getPositions(size_t pos) const {
+  return origPosition[pos];
+}
+
 void ConstraintSetView::push_back(ref<Expr> e, ConstraintPosition &&positions) {
   constraints.push_back(e);
   origPosition.push_back(std::move(positions));
@@ -383,17 +387,16 @@ void SimpleConstraintManager::push_back(ref<Expr> expr) {
 }
 
 void ReferencingConstraintManager::push_back(ref<Expr> expr) {
-  auto it = std::find(oldView.begin(), oldView.end(), expr);
-  if (it == oldView.end()) {
-    // count numbers of expression in simplified expression
-    ExprCountVisitor countingVisitor;
-    countingVisitor.visit(expr);
-    constraintSetView.push_back(
-        expr,
-        ConstraintPosition(/* unknown */ 0, /* unknown */ 0, /* version 0 */ 0,
-                           std::move(countingVisitor.found_symbols)));
-  } else
-    constraintSetView.push_back(expr, oldView.getPositions(it));
+  const Expr *p = expr.get();
+  size_t pos = 0;
+  for (const auto &e : oldView.constraints) {
+    if (e.get() == p) {
+      constraintSetView.push_back(expr, oldView.getPositions(pos));
+      return;
+    }
+    ++pos;
+  }
+  assert(0 && "Expression to be add not found in previous one");
 }
 
 void SimpleConstraintManager::clear() {
