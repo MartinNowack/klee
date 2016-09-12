@@ -104,7 +104,7 @@ public:
   constraint_iterator end() const { return constraints.cend(); }
   size_t size() const { return constraints.size(); }
 
-  ConstraintSetView() {}
+  ConstraintSetView():trackPos(false) {}
 
   bool operator==(const ConstraintSetView &other) const;
 
@@ -112,6 +112,7 @@ public:
 
 private:
   void push_back(ref<Expr> e, ConstraintPosition &&positions);
+  void push_nontracking(ref<Expr> e);
 
   /**
    * Moves constraints to other but keeps state.
@@ -125,6 +126,8 @@ private:
   // First: the origin position, second unique id
   std::vector<ConstraintPosition> origPosition;
 
+  // Indicator if positions are tracked by this view or not
+  bool trackPos;
 public:
   ConstraintPosition getPositions(const_iterator it) const;
   ConstraintPosition getPositions(size_t pos) const;
@@ -172,6 +175,7 @@ public:
 
   // Add constraint without simplification
   void push_back(ref<Expr> expr);
+  void push_back_nontracking(ref<Expr> expr);
 
   SimpleConstraintManager(const SimpleConstraintManager &) = delete;
 

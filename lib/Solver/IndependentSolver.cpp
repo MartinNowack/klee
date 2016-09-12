@@ -109,7 +109,7 @@ public:
 
   IndependentElementSet() = delete;
   IndependentElementSet(ref<Expr> e, const ConstraintSetView &origView) {
-    SimpleConstraintManager(exprs).push_back(e);
+    SimpleConstraintManager(exprs).push_back_nontracking(e);
     // Track all reads in the program.  Determines whether reads are
     // concrete or symbolic.  If they are symbolic, "collapses" array
     // by adding it to wholeObjects.  Otherwise, creates a mapping of
@@ -211,7 +211,7 @@ public:
     for (ConstraintSetView::const_iterator i = b.exprs.begin(),
                                            iE = b.exprs.end();
          i != iE; ++i) {
-      mng.push_back(*i);
+      mng.push_back_nontracking(*i);
     }
 
     bool modified = false;
