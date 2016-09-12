@@ -109,7 +109,7 @@ public:
 
   IndependentElementSet() = delete;
   IndependentElementSet(ref<Expr> e, const ConstraintSetView &origView) {
-    ReferencingConstraintManager(exprs, origView).push_back(e);
+    SimpleConstraintManager(exprs).push_back(e);
     // Track all reads in the program.  Determines whether reads are
     // concrete or symbolic.  If they are symbolic, "collapses" array
     // by adding it to wholeObjects.  Otherwise, creates a mapping of
