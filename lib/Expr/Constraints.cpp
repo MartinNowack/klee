@@ -62,11 +62,6 @@ void ConstraintSetView::dump() const {
        it != itE; ++it) {
     llvm::errs() << "{" << origPosition[i].constraint_id << "/"
                  << origPosition[i].constraint_width << "}\n";
-    llvm::errs() << "vars:[ ";
-    for (auto ar : origPosition[i].contained_symbols)
-      llvm::errs() << ar->name << ";";
-    llvm::errs() << "]\n";
-
     ++i;
     (*it)->dump();
   }
@@ -120,70 +115,25 @@ private:
   uint64_t counter;
 
 protected:
-  Action visitRead(const ReadExpr &re) {
-    const UpdateList &ul = re.updates;
-
-    // XXX should we memo better than what ExprVisitor is doing for us?
-    for (const UpdateNode *un = ul.head; un; un = un->next) {
-      visit(un->index);
-      visit(un->value);
-    }
-
-    if (ul.root->isSymbolicArray()) {
-      auto pos =
-          std::lower_bound(found_symbols.begin(), found_symbols.end(), ul.root);
-      if (pos == found_symbols.end() || ul.root < *pos)
-        found_symbols.insert(pos, ul.root);
-    }
-
-    return Action::doChildren();
-  }
-
   Action visitExprPost(const Expr &e) {
     ++counter;
     return Action::skipChildren();
   }
 
 public:
-  std::vector<const Array *> found_symbols;
-
   ExprCountVisitor() : ExprVisitor(true), counter(0) {}
 
   uint64_t getCounter() { return counter; }
 };
 
-std::vector<const Array *> ConstraintSetView::getUsedArrays() const {
-  std::vector<const Array *> usedArrays;
-
-  for (auto o_pos : origPosition) {
-    for (auto sym : o_pos.contained_symbols) {
-      auto pos = std::lower_bound(usedArrays.begin(), usedArrays.end(), sym);
-      if (pos == usedArrays.end() || sym < *pos)
-        usedArrays.insert(pos, sym);
-    }
-  }
-
-  return usedArrays;
-}
-
 ConstraintPosition::ConstraintPosition(
-    uint64_t constraint_id_, uint64_t constraint_width_, uint64_t version_,
-    std::vector<const Array *> &&contained_symbols_)
+    uint64_t constraint_id_, uint64_t constraint_width_, uint64_t version_)
     : constraint_id(constraint_id_), constraint_width(constraint_width_),
-      version(version_), contained_symbols(std::move(contained_symbols_)) {}
+      version(version_) {}
 
 void ConstraintPosition::dump() const {
-  llvm::errs() << "(" << constraint_id << ":" << constraint_width << ")[";
-  for (auto sym : contained_symbols)
-    llvm::errs() << sym->name << ",";
-  llvm::errs() << "]\n";
+  llvm::errs() << "(" << constraint_id << ":" << constraint_width << ")\n";
 }
-
-// bool ConstraintPosition::operator==(const ConstraintPosition &pos) const {
-//  // XXX CHECK
-//  return (constraint_id == pos.constraint_id &&
-//      (constraint_width == pos.constraint_width || constraint_width == 0));
-//}
 
 bool ConstraintManager::rewriteConstraints(ExprVisitor &visitor) {
   ConstraintSetView old;
@@ -199,18 +149,11 @@ bool ConstraintManager::rewriteConstraints(ExprVisitor &visitor) {
     auto positions = old.getPositions(it);
 
     if (e != ce) {
-      ExprCountVisitor oldCountingVisitor;
-      oldCountingVisitor.visit(ce);
-
-      ExprCountVisitor newCountingVisitor;
-      newCountingVisitor.visit(e);
-
       // enable further reductions
       addConstraintInternal(
           e, ConstraintPosition(positions.constraint_id,
                                 positions.constraint_width,
-                                constraintSetView.version_cntr++,
-                                std::move(newCountingVisitor.found_symbols)));
+                                constraintSetView.version_cntr++));
       changed = true;
     } else {
       constraintSetView.push_back(ce, std::move(positions));
@@ -266,9 +209,6 @@ void ConstraintManager::addConstraintInternal(ref<Expr> e,
     leftTreeCountingVisitor.visit(be->left);
     uint64_t left_node_count = leftTreeCountingVisitor.getCounter();
 
-    ExprCountVisitor rightTreeCountingVisitor;
-    rightTreeCountingVisitor.visit(be->right);
-
     // Using the node of the left tree and the whole tree,
     // we can calculate the absolute number
     uint64_t left_id =
@@ -276,13 +216,11 @@ void ConstraintManager::addConstraintInternal(ref<Expr> e,
     uint64_t right_id = position.constraint_id - 1;
     addConstraintInternal(
         be->left,
-        ConstraintPosition(left_id, left_node_count, position.version,
-                           std::move(leftTreeCountingVisitor.found_symbols)));
+        ConstraintPosition(left_id, left_node_count, position.version));
     addConstraintInternal(
         be->right, ConstraintPosition(
                        right_id, position.constraint_width - left_node_count,
-                       position.version,
-                       std::move(rightTreeCountingVisitor.found_symbols)));
+                       position.version));
     break;
   }
 
@@ -350,8 +288,7 @@ void ConstraintManager::addConstraint(ref<Expr> e) {
   uint64_t expression_position = ConstraintSetView::next_free_position;
 
   addConstraintInternal(
-      e, ConstraintPosition(expression_position, count_nodes, 0,
-                            std::move(countingVisitor.found_symbols)));
+      e, ConstraintPosition(expression_position, count_nodes, 0));
 
   // Sort constraints by origPosition
   auto it = std::is_sorted_until(constraintSetView.origPosition.begin(),
@@ -380,7 +317,7 @@ void ConstraintManager::addConstraint(ref<Expr> e) {
 void SimpleConstraintManager::push_back(ref<Expr> expr) {
   // We explicitly initialize the constraint position to 0
   // this should not be used to track constraints
-  constraintSetView.push_back(expr, ConstraintPosition(0, 0, 0, std::vector<const Array *>()));
+  constraintSetView.push_back(expr, ConstraintPosition(0, 0, 0));
 }
 
 void SimpleConstraintManager::push_back_nontracking(ref<Expr> expr) {

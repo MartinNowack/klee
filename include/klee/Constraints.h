@@ -42,12 +42,8 @@ struct ConstraintPosition {
   // Version of constraint position
   uint64_t version;
 
-  // Cache of contained symbols inside the constraints
-  std::vector<const Array *> contained_symbols;
-
   ConstraintPosition(uint64_t constraint_id_, uint64_t constraint_width_,
-                     uint64_t version,
-                     std::vector<const Array *> &&contained_symbols_);
+                     uint64_t version);
   void dump() const;
 };
 }
@@ -64,8 +60,6 @@ struct ConstraintPositionEqual {
     if (a.constraint_id != b.constraint_id)
       return false;
     if (a.constraint_width != b.constraint_width)
-      return false;
-    if (a.contained_symbols != b.contained_symbols)
       return false;
     return true;
   }
@@ -131,8 +125,6 @@ private:
 public:
   ConstraintPosition getPositions(const_iterator it) const;
   ConstraintPosition getPositions(size_t pos) const;
-
-  std::vector<const Array *> getUsedArrays() const;
 };
 
 /**
