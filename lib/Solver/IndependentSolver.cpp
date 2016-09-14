@@ -101,7 +101,7 @@ public:
   typedef std::map<const Array*, ::DenseSet<unsigned> > elements_ty;
   elements_ty elements;                 // Represents individual elements of array accesses (arr[1])
   std::set<const Array*> wholeObjects;  // Represents symbolically accessed arrays (arr[x])
-  ConstraintSetView
+  std::vector<ref<Expr> >
       exprs; // All expressions that are associated with this factor
              // Although order doesn't matter, we use a vector to match
              // the ConstraintManager constructor that will eventually
@@ -109,7 +109,7 @@ public:
 
   IndependentElementSet() = delete;
   IndependentElementSet(ref<Expr> e) {
-    SimpleConstraintManager(exprs).push_back_nontracking(e);
+    exprs.push_back(e);
     // Track all reads in the program.  Determines whether reads are
     // concrete or symbolic.  If they are symbolic, "collapses" array
     // by adding it to wholeObjects.  Otherwise, creates a mapping of
@@ -207,11 +207,8 @@ public:
 
   // returns true iff set is changed by addition
   bool add(const IndependentElementSet &b) {
-    SimpleConstraintManager mng(exprs);
-    for (ConstraintSetView::const_iterator i = b.exprs.begin(),
-                                           iE = b.exprs.end();
-         i != iE; ++i) {
-      mng.push_back_nontracking(*i);
+    for (auto i = b.exprs.begin(), iE = b.exprs.end(); i != iE; ++i) {
+      exprs.push_back(*i);
     }
 
     bool modified = false;
@@ -496,7 +493,9 @@ bool IndependentSolver::computeInitialValues(const Query& query,
     if (arraysInFactor.size() == 0){
       continue;
     }
-    ConstraintSetView tmp(it->exprs);
+    ConstraintSetView tmp;
+    for (auto e : it->exprs)
+      tmp.constraints.push_back(e);
     std::vector<std::vector<unsigned char> > tempValues;
     if (!solver->impl->computeInitialValues(
             Query(tmp, ConstantExpr::alloc(0, Expr::Bool), query.queryOrigin),
