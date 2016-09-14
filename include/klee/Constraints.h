@@ -112,7 +112,11 @@ private:
    * Moves constraints to other but keeps state.
    */
   void extractAndResetConstraints(ConstraintSetView &other);
+
+public:
   constraints_ty constraints;
+
+private:
   static uint64_t next_free_position;
   static uint64_t version_cntr;
 
@@ -135,9 +139,6 @@ public:
   // create from constraints with no optimization
   explicit ConstraintManager(ConstraintSetView &set) : constraintSetView(set) {}
 
-  ConstraintManager(const ConstraintManager &cs)
-      : constraintSetView(cs.constraintSetView) {}
-
   static ref<Expr> simplifyExpr(ref<Expr> e, const ConstraintSetView &view);
 
   ref<Expr> simplifyExpr(ref<Expr> e);
@@ -148,7 +149,8 @@ public:
     return constraintSetView == other.constraintSetView;
   }
 
-  virtual ~ConstraintManager(){};
+  ConstraintManager(const ConstraintManager &) = delete;
+  ConstraintManager &operator=(const ConstraintManager &) = delete;
 
 protected:
   ConstraintSetView &constraintSetView;
