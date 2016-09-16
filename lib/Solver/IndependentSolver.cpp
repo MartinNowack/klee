@@ -19,86 +19,20 @@
 #include "klee/util/Assignment.h"
 #include "klee/TimerStatIncrementer.h"
 #include "klee/SolverStats.h"
+
+#include "llvm/ADT/SparseBitVector.h"
 #include "llvm/Support/raw_ostream.h"
-#include <map>
-#include <vector>
-#include <ostream>
 #include <list>
+#include <map>
+#include <ostream>
+#include <vector>
 
 using namespace klee;
 using namespace llvm;
 
-template<class T>
-class DenseSet {
-  typedef std::set<T> set_ty;
-  set_ty s;
-
-public:
-  DenseSet() {}
-
-  void add(T x) {
-    s.insert(x);
-  }
-  void add(T start, T end) {
-    for (; start<end; start++)
-      s.insert(start);
-  }
-
-  // returns true iff set is changed by addition
-  bool add(const DenseSet &b) {
-    bool modified = false;
-    for (typename set_ty::const_iterator it = b.s.begin(), ie = b.s.end(); 
-         it != ie; ++it) {
-      if (modified || !s.count(*it)) {
-        modified = true;
-        s.insert(*it);
-      }
-    }
-    return modified;
-  }
-
-  bool intersects(const DenseSet &b) const {
-    for (typename set_ty::const_iterator it = s.begin(), ie = s.end(); it != ie;
-         ++it)
-      if (b.s.count(*it))
-        return true;
-    return false;
-  }
-
-  std::set<unsigned>::iterator begin(){
-    return s.begin();
-  }
-
-  std::set<unsigned>::iterator end(){
-    return s.end();
-  }
-
-  void print(llvm::raw_ostream &os) const {
-    bool first = true;
-    os << "{";
-    for (typename set_ty::iterator it = s.begin(), ie = s.end(); 
-         it != ie; ++it) {
-      if (first) {
-        first = false;
-      } else {
-        os << ",";
-      }
-      os << *it;
-    }
-    os << "}";
-  }
-};
-
-template <class T>
-inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
-                                     const ::DenseSet<T> &dis) {
-  dis.print(os);
-  return os;
-}
-
 class IndependentElementSet {
 public:
-  typedef std::map<const Array*, ::DenseSet<unsigned> > elements_ty;
+  typedef std::map<const Array *, llvm::SparseBitVector<64> > elements_ty;
   elements_ty elements;                 // Represents individual elements of array accesses (arr[1])
   std::set<const Array*> wholeObjects;  // Represents symbolically accessed arrays (arr[x])
   std::vector<ref<Expr> >
@@ -130,8 +64,8 @@ public:
         if (ConstantExpr *CE = dyn_cast<ConstantExpr>(re->index)) {
           // if index constant, then add to set of constraints operating
           // on that array (actually, don't add constraint, just set index)
-          ::DenseSet<unsigned> &dis = elements[array];
-          dis.add((unsigned) CE->getZExtValue(32));
+          auto &dis = elements[array];
+          dis.set((unsigned)CE->getZExtValue(32));
         } else {
           elements_ty::iterator it2 = elements.find(array);
           if (it2!=elements.end())
@@ -165,7 +99,7 @@ public:
     for (elements_ty::const_iterator it = elements.begin(), ie = elements.end();
          it != ie; ++it) {
       const Array *array = it->first;
-      const ::DenseSet<unsigned> &dis = it->second;
+      const auto &dis = it->second;
 
       if (first) {
         first = false;
@@ -173,7 +107,8 @@ public:
         os << ", ";
       }
 
-      os << "MO" << array->name << " : " << dis;
+      os << "MO" << array->name << " : ";
+      llvm::dump(dis, os);
     }
     os << "}";
   }
@@ -237,7 +172,7 @@ public:
           elements.insert(*it);
         } else {
           // Now need to see if there are any (z=?)'s
-          if (it2->second.add(it->second))
+          if (it2->second |= it->second)
             modified = true;
         }
       }
@@ -316,6 +251,7 @@ static void getIndependentConstraints(const Query &query,
   IndependentElementSet eltsClosure(query.expr);
   ReferencingConstraintManager result(resultView, query.constraints);
   std::vector< std::pair<ref<Expr>, IndependentElementSet> > worklist;
+  worklist.reserve(query.constraints.size());
 
   for (ConstraintSetView::const_iterator it = query.constraints.begin(),
                                          ie = query.constraints.end();
@@ -369,8 +305,7 @@ static
 void calculateArrayReferences(const IndependentElementSet & ie,
                               std::vector<const Array *> &returnVector){
   std::set<const Array*> thisSeen;
-  for(std::map<const Array*, ::DenseSet<unsigned> >::const_iterator it = ie.elements.begin();
-      it != ie.elements.end(); it ++){
+  for (auto it = ie.elements.begin(); it != ie.elements.end(); it++) {
     thisSeen.insert(it->first);
   }
   for(std::set<const Array *>::iterator it = ie.wholeObjects.begin();
@@ -516,8 +451,8 @@ bool IndependentSolver::computeInitialValues(const Query& query,
           std::vector<unsigned char> * tempPtr = &retMap[arraysInFactor[i]];
           assert(tempPtr->size() == tempValues[i].size() &&
                  "we're talking about the same array here");
-          ::DenseSet<unsigned> * ds = &(it->elements[arraysInFactor[i]]);
-          for (std::set<unsigned>::iterator it2 = ds->begin(); it2 != ds->end(); it2++){
+          auto *ds = &(it->elements[arraysInFactor[i]]);
+          for (auto it2 = ds->begin(); it2 != ds->end(); it2++) {
             unsigned index = * it2;
             (* tempPtr)[index] = tempValues[i][index];
           }
