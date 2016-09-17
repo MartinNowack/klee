@@ -525,6 +525,7 @@ serializeQuery(const Query &query, const std::vector<const Array *> &arrays) {
 
 void Serializer::serializeQuery(const Query &query,
                                 const std::vector<const Array *> &arrays) {
+  TimerStatIncrementer t(stats::serializerTime);
   memObj.clearMemory();
   ExpressionSerializer<serial::QueryContainer> of(memObj);
 

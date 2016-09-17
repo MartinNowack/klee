@@ -27,6 +27,9 @@ namespace stats {
   extern Statistic queryConstructs;
   extern Statistic queryCounterexamples;
   extern Statistic queryTime;
+  extern Statistic indepConstraintsTime;
+  extern Statistic serializerTime;
+  extern Statistic addConstraintTime;
   
 #ifdef DEBUG
   extern Statistic arrayHashTime;

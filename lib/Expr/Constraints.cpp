@@ -18,6 +18,8 @@
 #endif
 #include "llvm/Support/CommandLine.h"
 #include "klee/Internal/Module/KModule.h"
+#include "klee/TimerStatIncrementer.h"
+#include "klee/SolverStats.h"
 
 #include <map>
 
@@ -166,6 +168,8 @@ void ConstraintManager::addConstraintInternal(ref<Expr> e) {
 }
 
 void ConstraintManager::addConstraint(ref<Expr> e) {
+  TimerStatIncrementer t(stats::addConstraintTime);
+
   e = simplifyExpr(e);
   addConstraintInternal(e);
 }
