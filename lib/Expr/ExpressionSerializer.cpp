@@ -788,7 +788,7 @@ public:
     SimpleConstraintManager sm(m);
 
     for (auto c : qc.getConstraints()) {
-      sm.push_back(genExpr(c));
+      sm.push_back_nontracking(genExpr(c));
     }
     requestedArrayIndex = qc.getRequestedArrayIndex();
     return Query(m, genExpr(qc.getQuery()), nullptr);
