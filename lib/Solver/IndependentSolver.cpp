@@ -140,9 +140,9 @@ bool IndependentSolver::computeInitialValues(const Query& query,
       continue;
     }
     ConstraintSetView tmp;
-    ReferencingConstraintManager m(tmp, it->exprs)
+    ReferencingConstraintManager m(tmp, query.constraints);
     for (auto e : it->exprs)
-      tmp.constraints.push_back(e);
+      m.push_back(e);
     std::vector<std::vector<unsigned char> > tempValues;
     if (!solver->impl->computeInitialValues(
             Query(tmp, ConstantExpr::alloc(0, Expr::Bool), query.queryOrigin),
