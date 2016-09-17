@@ -101,7 +101,7 @@ public:
   constraint_iterator end() const { return constraints.cend(); }
   size_t size() const { return constraints.size(); }
 
-  ConstraintSetView():trackPos(false) {}
+  ConstraintSetView();
 
 public:
   ConstraintSetView &operator=(const ConstraintSetView &) = delete;
@@ -113,21 +113,10 @@ public:
 
   void dump() const;
 
-  ConstraintSetView clone() const { return ConstraintSetView(*this); }
+  ConstraintSetView clone() const;
 
 private:
-  ConstraintSetView(const ConstraintSetView &csv) {
-    constraints.reserve(csv.constraints.size());
-    for (auto cs : csv.constraints)
-      constraints.emplace_back(cs);
-    trackPos = csv.trackPos;
-    origPosition.reserve(csv.origPosition.size());
-    for (auto pos : csv.origPosition)
-      origPosition.emplace_back(pos);
-    //    for(auto elem: csv.independence_cache)
-    //	   independence_cache.insert(std::make_pair(std::make_uniqe_ptr));
-  }
-
+  ConstraintSetView(const ConstraintSetView &csv);
   void push_back(ref<Expr> e, ConstraintPosition &&positions);
   void push_nontracking(ref<Expr> e);
 
@@ -151,8 +140,7 @@ private:
   bool trackPos;
 
   // Track independence sets
-  std::vector<std::pair<std::unique_ptr<IndependentElementSet>,
-                        std::vector<ref<Expr> > > >
+  std::vector<std::pair<IndependentElementSet, std::vector<ref<Expr> > > >
       independence_cache;
 
 public:

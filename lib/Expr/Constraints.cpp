@@ -52,6 +52,24 @@ void ConstraintSetView::extractAndResetConstraints(ConstraintSetView &other) {
   //  std::swap(next_free_position, other.next_free_position);
 }
 
+ConstraintSetView ConstraintSetView::clone() const {
+  return ConstraintSetView(*this);
+}
+
+ConstraintSetView::ConstraintSetView() : trackPos(false) {}
+
+ConstraintSetView::ConstraintSetView(const ConstraintSetView &csv) {
+  constraints.reserve(csv.constraints.size());
+  for (auto cs : csv.constraints)
+    constraints.emplace_back(cs);
+  trackPos = csv.trackPos;
+  origPosition.reserve(csv.origPosition.size());
+  for (auto pos : csv.origPosition)
+    origPosition.emplace_back(pos);
+  //    for(auto elem: csv.independence_cache)
+  //     independence_cache.insert(std::make_pair(std::make_uniqe_ptr));
+}
+
 bool ConstraintSetView::operator==(const ConstraintSetView &other) const {
   return constraints == other.constraints;
 }
