@@ -17,7 +17,8 @@
 
 #include "klee/util/ExprUtil.h"
 #include "klee/util/Assignment.h"
-
+#include "klee/TimerStatIncrementer.h"
+#include "klee/SolverStats.h"
 #include "llvm/Support/raw_ostream.h"
 #include <map>
 #include <vector>
@@ -317,6 +318,8 @@ getAllIndependentConstraintsSets(const Query &query) {
 static 
 IndependentElementSet getIndependentConstraints(const Query& query,
                                                 std::vector< ref<Expr> > &result) {
+  TimerStatIncrementer t(stats::indepConstraintsTime);
+
   IndependentElementSet eltsClosure(query.expr);
   std::vector< std::pair<ref<Expr>, IndependentElementSet> > worklist;
 

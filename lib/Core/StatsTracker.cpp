@@ -435,6 +435,9 @@ void StatsTracker::writeStatsHeader() {
 	     << "'CacheHits',"
 	     << "'CacheMisses',"
 	     << "'ExprCntr',"
+	     << "'IndepConstraintsTime',"
+	     << "'SerializerTime',"
+	     << "'AddConstraintTime',"
              << ")\n";
   statsFile->flush();
 }
@@ -468,6 +471,9 @@ void StatsTracker::writeStatsLine() {
 	     << "," << stats::queryCacheHits
 	     << "," << stats::queryCacheMisses
 	     << "," << Expr::count
+	     << "," << stats::indepConstraintsTime
+	     << "," << stats::serializerTime
+	     << "," << stats::addConstraintTime
              << ")\n";
   statsFile->flush();
 }
