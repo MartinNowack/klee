@@ -88,7 +88,7 @@ ExecutionState::ExecutionState(KFunction *kf) :
 }
 
 ExecutionState::ExecutionState(const ConstraintSetView &assumptions)
-    : constraints(assumptions), queryCost(0.), ptreeNode(0) {
+    : constraints(assumptions.clone()), queryCost(0.), ptreeNode(0) {
   uid = generateStateUid();
 }
 
@@ -109,7 +109,7 @@ ExecutionState::ExecutionState(const ExecutionState &state)
     : fnAliases(state.fnAliases), pc(state.pc), prevPC(state.prevPC),
       stack(state.stack), incomingBBIndex(state.incomingBBIndex),
 
-      addressSpace(state.addressSpace), constraints(state.constraints),
+      addressSpace(state.addressSpace), constraints(state.constraints.clone()),
 
       queryCost(state.queryCost), weight(state.weight), depth(state.depth),
 

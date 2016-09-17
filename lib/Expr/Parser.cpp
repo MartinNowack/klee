@@ -687,7 +687,7 @@ DeclResult ParserImpl::ParseQueryCommand() {
   if (ClearArrayAfterQuery)
     ArraySymTab.clear();
 
-  return new QueryCommand(Constraints, Res.get(), Values, Objects);
+  return new QueryCommand(std::move(Constraints), Res.get(), Values, Objects);
 }
 
 /// ParseNumberOrExpr - Parse an expression whose type cannot be
@@ -1634,9 +1634,8 @@ void QueryCommand::dump() {
   }
   ConstraintSetView view;
   SimpleConstraintManager m(view);
-  ExprPPrinter::printQuery(llvm::outs(), ConstraintSetView(Constraints), Query,
-                           ValuesBegin, ValuesEnd, ObjectsBegin, ObjectsEnd,
-                           false);
+  ExprPPrinter::printQuery(llvm::outs(), Constraints, Query, ValuesBegin,
+                           ValuesEnd, ObjectsBegin, ObjectsEnd, false);
 }
 
 // Public parser API

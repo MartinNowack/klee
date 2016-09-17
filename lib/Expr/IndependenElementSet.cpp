@@ -181,14 +181,14 @@ void getAllIndependentConstraintsSets(
   do {
     doneLoop = true;
     std::list<IndependentElementSet> done;
-    while (factors.size() > 0) {
+    while (!factors.empty()) {
       IndependentElementSet current = std::move(factors.front());
       factors.pop_front();
       // This list represents the set of factors that are separate from current.
       // Those that are not inserted into this list (queue) intersect with
       // current.
       std::list<IndependentElementSet> keep;
-      while (factors.size() > 0) {
+      while (!factors.empty()) {
         IndependentElementSet compare = std::move(factors.front());
         factors.pop_front();
         if (current.intersects(compare)) {
