@@ -184,11 +184,12 @@ namespace expr {
     const std::vector<const Array*> Objects;
 
   public:
-    QueryCommand(const ConstraintSetView &_Constraints, ExprHandle _Query,
+    QueryCommand(ConstraintSetView _Constraints, ExprHandle _Query,
                  const std::vector<ExprHandle> &_Values,
                  const std::vector<const Array *> &_Objects)
-        : CommandDecl(QueryCommandDeclKind), Constraints(_Constraints),
-          Query(_Query), Values(_Values), Objects(_Objects) {}
+        : CommandDecl(QueryCommandDeclKind),
+          Constraints(std::move(_Constraints)), Query(_Query), Values(_Values),
+          Objects(_Objects) {}
 
     virtual void dump();
 

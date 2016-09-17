@@ -14,22 +14,25 @@
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
+#include <memory>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
 #include "Expr.h"
+#include "klee/util/IndependentElementSet.h"
 #include "util/Ref.h"
 
 namespace klee {
 
 class Array;
-class ExprVisitor;
 class ConstraintManager;
 class ConstraintSetView;
-class SimpleConstraintManager;
-class ReferencingConstraintManager;
 class Expr;
+class ExprVisitor;
+class ReferencingConstraintManager;
+class SimpleConstraintManager;
+class IndependentElementSet;
 
 struct ConstraintPosition {
   // Unique ID of the constraint
@@ -100,11 +103,31 @@ public:
 
   ConstraintSetView():trackPos(false) {}
 
+public:
+  ConstraintSetView &operator=(const ConstraintSetView &) = delete;
+
+  ConstraintSetView(ConstraintSetView &&) = default;
+  ConstraintSetView &operator=(ConstraintSetView &&) = default;
+
   bool operator==(const ConstraintSetView &other) const;
 
   void dump() const;
 
+  ConstraintSetView clone() const { return ConstraintSetView(*this); }
+
 private:
+  ConstraintSetView(const ConstraintSetView &csv) {
+    constraints.reserve(csv.constraints.size());
+    for (auto cs : csv.constraints)
+      constraints.emplace_back(cs);
+    trackPos = csv.trackPos;
+    origPosition.reserve(csv.origPosition.size());
+    for (auto pos : csv.origPosition)
+      origPosition.emplace_back(pos);
+    //    for(auto elem: csv.independence_cache)
+    //	   independence_cache.insert(std::make_pair(std::make_uniqe_ptr));
+  }
+
   void push_back(ref<Expr> e, ConstraintPosition &&positions);
   void push_nontracking(ref<Expr> e);
 
@@ -126,6 +149,12 @@ private:
 
   // Indicator if positions are tracked by this view or not
   bool trackPos;
+
+  // Track independence sets
+  std::vector<std::pair<std::unique_ptr<IndependentElementSet>,
+                        std::vector<ref<Expr> > > >
+      independence_cache;
+
 public:
   ConstraintPosition getPositions(const_iterator it) const;
   ConstraintPosition getPositions(size_t pos) const;

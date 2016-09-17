@@ -239,9 +239,7 @@ static bool EvaluateInputAST(const char *Filename,
       assert("FIXME: Support counterexample query commands!");
       if (QC->Values.empty() && QC->Objects.empty()) {
         bool result;
-        if (S->mustBeTrue(
-                Query(ConstraintSetView(QC->Constraints), QC->Query, nullptr),
-                result)) {
+        if (S->mustBeTrue(Query(QC->Constraints, QC->Query, nullptr), result)) {
           llvm::outs() << (result ? "VALID" : "INVALID");
         } else {
           llvm::outs() << "FAIL (reason: "
@@ -256,8 +254,7 @@ static bool EvaluateInputAST(const char *Filename,
         assert(QC->Query->isFalse() &&
                "FIXME: Support counterexamples with non-trivial query!");
         ref<ConstantExpr> result;
-        if (S->getValue(Query(ConstraintSetView(QC->Constraints), QC->Values[0],
-                              nullptr),
+        if (S->getValue(Query(QC->Constraints, QC->Values[0], nullptr),
                         result)) {
           llvm::outs() << "INVALID\n";
           llvm::outs() << "\tExpr 0:\t" << result;
@@ -269,9 +266,8 @@ static bool EvaluateInputAST(const char *Filename,
       } else {
         std::vector< std::vector<unsigned char> > result;
 
-        if (S->getInitialValues(
-                Query(ConstraintSetView(QC->Constraints), QC->Query, nullptr),
-                QC->Objects, result)) {
+        if (S->getInitialValues(Query(QC->Constraints, QC->Query, nullptr),
+                                QC->Objects, result)) {
           llvm::outs() << "INVALID\n";
 
           for (unsigned i = 0, e = result.size(); i != e; ++i) {
@@ -378,8 +374,7 @@ static bool printInputAsSMTLIBv2(const char *Filename,
 			 * will later cause a NULL pointer dereference.
 			 */
                         /// XXX Fixme
-                        ConstraintSetView constraintM(QC->Constraints);
-                        Query query(constraintM, QC->Query, nullptr);
+                        Query query(QC->Constraints, QC->Query, nullptr);
                         printer.setQuery(query);
 
                         if (!QC->Objects.empty())

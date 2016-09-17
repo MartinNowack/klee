@@ -25,6 +25,7 @@
 #include <tr1/unordered_map>
 #define unordered_map std::tr1::unordered_map
 #endif
+#include <vector>
 
 using namespace klee;
 
@@ -41,12 +42,12 @@ private:
   
   struct CacheEntry {
     CacheEntry(const ConstraintSetView &c, ref<Expr> q)
-        : constraints(c), query(q) {}
+        : constraints(c.constraints), query(q) {}
 
     CacheEntry(const CacheEntry &ce)
       : constraints(ce.constraints), query(ce.query) {}
 
-    ConstraintSetView constraints;
+    std::vector<ref<Expr> > constraints;
     ref<Expr> query;
 
     bool operator==(const CacheEntry &b) const {

@@ -17,58 +17,55 @@
 
 namespace klee {
 class ConstraintSetView;
-  class Expr;
-  class SolverImpl;
-  class ExecutionState;
+class Expr;
+class SolverImpl;
+class ExecutionState;
 
-  struct Query {
-  public:
-    const ConstraintSetView &constraints;
-    ref<Expr> expr;
-    const ExecutionState *queryOrigin;
+struct Query {
+public:
+  const ConstraintSetView &constraints;
+  ref<Expr> expr;
+  const ExecutionState *queryOrigin;
 
-    Query(const ConstraintSetView &_constraints, ref<Expr> _expr,
-          const ExecutionState *originState)
-        : constraints(_constraints), expr(_expr), queryOrigin(originState),
-          incremental_flag(false), reused_cntr(0), query_size(0),
-          added_constraints(0), solver_id(0) {}
+  Query(const ConstraintSetView &_constraints, ref<Expr> _expr,
+        const ExecutionState *originState)
+      : constraints(_constraints), expr(_expr), queryOrigin(originState),
+        incremental_flag(false), reused_cntr(0), query_size(0),
+        added_constraints(0), solver_id(0) {}
 
-    /// withExpr - Return a copy of the query with the given expression.
-    Query withExpr(ref<Expr> _expr) const {
-      return Query(constraints, _expr, queryOrigin);
-    }
+  /// withExpr - Return a copy of the query with the given expression.
+  Query withExpr(ref<Expr> _expr) const {
+    return Query(constraints, _expr, queryOrigin);
+  }
 
-    /// withFalse - Return a copy of the query with a false expression.
-    Query withFalse() const {
-      return Query(constraints, ConstantExpr::alloc(0, Expr::Bool),
-                   queryOrigin);
-    }
+  /// withFalse - Return a copy of the query with a false expression.
+  Query withFalse() const {
+    return Query(constraints, ConstantExpr::alloc(0, Expr::Bool), queryOrigin);
+  }
 
-    /// negateExpr - Return a copy of the query with the expression negated.
-    Query negateExpr() const {
-      return withExpr(Expr::createIsZero(expr));
-    }
+  /// negateExpr - Return a copy of the query with the expression negated.
+  Query negateExpr() const { return withExpr(Expr::createIsZero(expr)); }
 
-    /// Dump query
-    void dump() const ;
+  /// Dump query
+  void dump() const;
 
-    /// Query stats
-    mutable bool incremental_flag;
+  /// Query stats
+  mutable bool incremental_flag;
 
-    /// Number of reused constraints
-    mutable size_t reused_cntr;
+  /// Number of reused constraints
+  mutable size_t reused_cntr;
 
-    /// Number of overall constraints on the solver side
-    /// This include additional constraints which are not used
-    /// in case of incremental solving but still are part of the
-    /// solver state.
-    mutable size_t query_size;
+  /// Number of overall constraints on the solver side
+  /// This include additional constraints which are not used
+  /// in case of incremental solving but still are part of the
+  /// solver state.
+  mutable size_t query_size;
 
-    /// Newly added constraints
-    mutable size_t added_constraints;
+  /// Newly added constraints
+  mutable size_t added_constraints;
 
-    /// ID of the solver
-    mutable size_t solver_id;
+  /// ID of the solver
+  mutable size_t solver_id;
   };
 
   class Solver {
