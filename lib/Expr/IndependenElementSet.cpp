@@ -10,13 +10,17 @@
 #define DEBUG_TYPE "independent-solver"
 #include "klee/Internal/Support/Debug.h"
 #include "klee/util/IndependentElementSet.h"
+#include "klee/Constraints.h"
 #include "klee/util/ExprUtil.h"
 #include "klee/TimerStatIncrementer.h"
 #include "klee/SolverStats.h"
+#include "klee/Solver.h"
 
 namespace klee {
 
 IndependentElementSet::IndependentElementSet(ref<Expr> e) {
+  if (e.isNull())
+    return;
   exprs.push_back(e);
   // Track all reads in the program.  Determines whether reads are
   // concrete or symbolic.  If they are symbolic, "collapses" array
@@ -48,6 +52,11 @@ IndependentElementSet::IndependentElementSet(ref<Expr> e) {
     }
   }
 }
+
+IndependentElementSet IndependentElementSet::clone() const {
+  return IndependentElementSet(*this);
+}
+
 void IndependentElementSet::print(llvm::raw_ostream &os) const {
   os << "{";
   bool first = true;
@@ -62,7 +71,7 @@ void IndependentElementSet::print(llvm::raw_ostream &os) const {
       os << ", ";
     }
 
-    os << "MO" << array->name;
+    os << "MO: " << array->name;
   }
   for (elements_ty::const_iterator it = elements.begin(), ie = elements.end();
        it != ie; ++it) {
@@ -75,7 +84,7 @@ void IndependentElementSet::print(llvm::raw_ostream &os) const {
       os << ", ";
     }
 
-    os << "MO" << array->name << " : ";
+    os << "MO: " << array->name << " : ";
     llvm::dump(dis, os);
   }
   os << "}";
@@ -150,114 +159,9 @@ bool IndependentElementSet::add(const IndependentElementSet &b) {
   return modified;
 }
 
-// Breaks down a constraint into all of it's individual pieces, returning a
-// list of IndependentElementSets or the independent factors.
-//
-// Caller takes ownership of returned std::list.
-
-void getAllIndependentConstraintsSets(
-    const Query &query, std::list<IndependentElementSet> &factors) {
-  ConstantExpr *CE = dyn_cast<ConstantExpr>(query.expr);
-  if (CE) {
-    assert(CE && CE->isFalse() && "the expr should always be false and "
-                                  "therefore not included in factors");
-  } else {
-    ref<Expr> neg = Expr::createIsZero(query.expr);
-    factors.push_back(IndependentElementSet(neg));
-  }
-
-  for (ConstraintSetView::const_iterator it = query.constraints.begin(),
-                                         ie = query.constraints.end();
-       it != ie; ++it) {
-    // iterate through all the previously separated constraints.  Until we
-    // actually return, factors is treated as a queue of expressions to be
-    // evaluated.  If the queue property isn't maintained, then the exprs
-    // could be returned in an order different from how they came in, negatively
-    // affecting later stages.
-    factors.push_back(IndependentElementSet(*it));
-  }
-
-  bool doneLoop = false;
-  do {
-    doneLoop = true;
-    std::list<IndependentElementSet> done;
-    while (!factors.empty()) {
-      IndependentElementSet current = std::move(factors.front());
-      factors.pop_front();
-      // This list represents the set of factors that are separate from current.
-      // Those that are not inserted into this list (queue) intersect with
-      // current.
-      std::list<IndependentElementSet> keep;
-      while (!factors.empty()) {
-        IndependentElementSet compare = std::move(factors.front());
-        factors.pop_front();
-        if (current.intersects(compare)) {
-          if (current.add(compare)) {
-            // Means that we have added (z=y)added to (x=y)
-            // Now need to see if there are any (z=?)'s
-            doneLoop = false;
-          }
-        } else {
-          keep.emplace_back(std::move(compare));
-        }
-      }
-      done.emplace_back(std::move(current));
-      factors.swap(keep);
-    }
-    factors.swap(done);
-  } while (!doneLoop);
-}
-
 void getIndependentConstraints(const Query &query,
                                ConstraintSetView &resultView) {
-  IndependentElementSet eltsClosure(query.expr);
-  ReferencingConstraintManager result(resultView, query.constraints);
-  std::vector<std::pair<ref<Expr>, IndependentElementSet> > worklist;
-  worklist.reserve(query.constraints.size());
-
-  for (ConstraintSetView::const_iterator it = query.constraints.begin(),
-                                         ie = query.constraints.end();
-       it != ie; ++it)
-    worklist.push_back(std::make_pair(*it, IndependentElementSet(*it)));
-
-  // XXX This should be more efficient (in terms of low level copy stuff).
-  bool done = false;
-  do {
-    done = true;
-    std::vector<std::pair<ref<Expr>, IndependentElementSet> > newWorklist;
-    for (std::vector<std::pair<ref<Expr>, IndependentElementSet> >::iterator
-             it = worklist.begin(),
-             ie = worklist.end();
-         it != ie; ++it) {
-      if (it->second.intersects(eltsClosure)) {
-        if (eltsClosure.add(it->second))
-          done = false;
-        result.push_back(it->first);
-        // Means that we have added (z=y)added to (x=y)
-        // Now need to see if there are any (z=?)'s
-      } else {
-        newWorklist.emplace_back(std::move(*it));
-      }
-    }
-    if (!done)
-      worklist.swap(newWorklist);
-  } while (!done);
-
-  KLEE_DEBUG(
-      std::set<ref<Expr> > reqset(resultView.begin(), resultView.end());
-      llvm::errs() << "--\n"; llvm::errs() << "Q: " << query.expr << "\n";
-      llvm::errs() << "\telts: " << IndependentElementSet(query.expr) << "\n";
-      int i = 0;
-      for (ConstraintSetView::const_iterator it = query.constraints.begin(),
-           ie = query.constraints.end();
-           it != ie; ++it) {
-        llvm::errs() << "C" << i++ << ": " << *it;
-        llvm::errs() << " "
-                     << (reqset.count(*it) ? "(required)" : "(independent)")
-                     << "\n";
-        llvm::errs() << "\telts: " << IndependentElementSet(*it) << "\n";
-      } llvm::errs()
-      << "elts closure: " << eltsClosure << "\n";);
+  resultView = query.constraints.filterClone(query.expr);
 }
 
 // Extracts which arrays are referenced from a particular independent set.
@@ -277,5 +181,27 @@ void calculateArrayReferences(const IndependentElementSet &ie,
        it != thisSeen.end(); it++) {
     returnVector.push_back(*it);
   }
+}
+
+bool IndependentElementSet::
+operator==(const IndependentElementSet &other) const {
+  if (wholeObjects.size() != other.wholeObjects.size() ||
+      elements.size() != other.elements.size())
+    return false;
+
+  for (auto a : wholeObjects) {
+    if (!other.wholeObjects.count(a))
+      return false;
+  }
+
+  for (auto a : elements) {
+    auto it = other.elements.find(a.first);
+    if (it == other.elements.end())
+      return false;
+    if (it->second != a.second)
+      return false;
+  }
+
+  return true;
 }
 }

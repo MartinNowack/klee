@@ -42,7 +42,7 @@ private:
   
   struct CacheEntry {
     CacheEntry(const ConstraintSetView &c, ref<Expr> q)
-        : constraints(c.constraints), query(q) {}
+        : constraints(c.begin(), c.end()), query(q) {}
 
     CacheEntry(const CacheEntry &ce)
       : constraints(ce.constraints), query(ce.query) {}
@@ -59,8 +59,7 @@ private:
     unsigned operator()(const CacheEntry &ce) const {
       unsigned result = ce.query->hash();
 
-      for (ConstraintSetView::constraint_iterator it = ce.constraints.begin();
-           it != ce.constraints.end(); ++it)
+      for (auto it = ce.constraints.begin(); it != ce.constraints.end(); ++it)
         result ^= (*it)->hash();
       
       return result;

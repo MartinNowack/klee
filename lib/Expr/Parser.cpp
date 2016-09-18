@@ -687,7 +687,7 @@ DeclResult ParserImpl::ParseQueryCommand() {
   if (ClearArrayAfterQuery)
     ArraySymTab.clear();
 
-  return new QueryCommand(std::move(Constraints), Res.get(), Values, Objects);
+  return new QueryCommand(Constraints.clone(), Res.get(), Values, Objects);
 }
 
 /// ParseNumberOrExpr - Parse an expression whose type cannot be

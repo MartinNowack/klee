@@ -8,17 +8,20 @@
 //===----------------------------------------------------------------------===//
 #ifndef KLEE_UTIL_INDEPENDENTELEMENTSET_H
 #define KLEE_UTIL_INDEPENDENTELEMENTSET_H
-#include "klee/Expr.h"
-#include "klee/Constraints.h"
-#include "klee/Solver.h"
 
 #include "llvm/ADT/SparseBitVector.h"
-#include "llvm/Support/raw_ostream.h"
 #include <list>
 #include <map>
-#include <ostream>
-#include <vector>
 #include <set>
+#include <vector>
+
+#include "klee/Expr.h"
+#include "Ref.h"
+
+namespace klee {
+class ConstraintSetView;
+struct Query;
+} /* namespace klee */
 
 namespace klee {
 
@@ -35,9 +38,8 @@ public:
              // the ConstraintManager constructor that will eventually
              // be invoked.
 
-  IndependentElementSet() = delete;
+  IndependentElementSet(){};
   IndependentElementSet(ref<Expr> e);
-  IndependentElementSet(const IndependentElementSet &ies) = delete;
   IndependentElementSet &operator=(const IndependentElementSet &ies) = delete;
   IndependentElementSet(IndependentElementSet &&set) = default;
   IndependentElementSet &operator=(IndependentElementSet &&set) = default;
@@ -46,6 +48,12 @@ public:
 
   bool intersects(const IndependentElementSet &b) const;
   bool add(const IndependentElementSet &b);
+
+  IndependentElementSet clone() const;
+  bool operator==(const IndependentElementSet &other) const;
+
+private:
+  IndependentElementSet(const IndependentElementSet &ies) = default;
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
@@ -54,13 +62,6 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
   return os;
 }
 
-// Breaks down a constraint into all of it's individual pieces, returning a
-// list of IndependentElementSets or the independent factors.
-//
-// Caller takes ownership of returned std::list.
-
-void getAllIndependentConstraintsSets(
-    const Query &query, std::list<IndependentElementSet> &factors);
 void getIndependentConstraints(const Query &query,
                                ConstraintSetView &resultView);
 
