@@ -162,8 +162,8 @@ char *STPSolverImpl::getConstraintLog(const Query &query) {
   if (!emptyConstraints) {
     vc_push(vc);
     ++stackIndex;
-    for (std::vector<ref<Expr> >::const_iterator it = query.constraints.begin(),
-                                                 ie = query.constraints.end();
+    for (ConstraintSetView::const_iterator it = query.constraints.begin(),
+                                           ie = query.constraints.end();
          it != ie; ++it)
       vc_assertFormula(vc, builder->construct(*it));
   }

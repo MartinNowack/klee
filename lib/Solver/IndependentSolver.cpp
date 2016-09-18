@@ -95,7 +95,7 @@ bool assertCreatedPointEvaluatesToTrue(const Query &query,
   if (retMap.size() > 0)
     assign.bindings.insert(retMap.begin(), retMap.end());
 
-  for (ConstraintSetView::constraint_iterator it = query.constraints.begin();
+  for (ConstraintSetView::iterator it = query.constraints.begin();
        it != query.constraints.end(); ++it) {
     // Do not force concretization of symbolic values, in that case we will end
     // up with a non ConstantExpr after evaluating the assignment and fail
@@ -126,13 +126,22 @@ bool IndependentSolver::computeInitialValues(const Query& query,
   // we need initial values for requested array objects.
   hasSolution = true;
 
-  std::list<IndependentElementSet> factors;
-  getAllIndependentConstraintsSets(query, factors);
+  // Use a copy of the independent set we collected so far
+  // and add the expression of the query
+  auto new_set = query.constraints.clone();
+
+  ConstantExpr *CE = dyn_cast<ConstantExpr>(query.expr);
+  if (CE) {
+    assert(CE && CE->isFalse() && "the expr should always be false and "
+                                  "therefore not included in factors");
+  } else {
+    ref<Expr> neg = Expr::createIsZero(query.expr);
+    SimpleConstraintManager(new_set).push_back(neg);
+  }
 
   //Used to rearrange all of the answers into the correct order
   std::map<const Array*, std::vector<unsigned char> > retMap;
-  for (std::list<IndependentElementSet>::iterator it = factors.begin();
-       it != factors.end(); ++it) {
+  for (auto it = new_set.iset_begin(); it != new_set.iset_end(); ++it) {
     std::vector<const Array*> arraysInFactor;
     calculateArrayReferences(*it, arraysInFactor);
     // Going to use this as the "fresh" expression for the Query() invocation below
@@ -141,7 +150,7 @@ bool IndependentSolver::computeInitialValues(const Query& query,
       continue;
     }
     ConstraintSetView tmp;
-    ReferencingConstraintManager m(tmp, query.constraints);
+    ReferencingConstraintManager m(tmp, new_set);
     for (auto e : it->exprs)
       m.push_back(e);
     std::vector<std::vector<unsigned char> > tempValues;
@@ -164,9 +173,7 @@ bool IndependentSolver::computeInitialValues(const Query& query,
           std::vector<unsigned char> * tempPtr = &retMap[arraysInFactor[i]];
           assert(tempPtr->size() == tempValues[i].size() &&
                  "we're talking about the same array here");
-          auto *ds = &(it->elements[arraysInFactor[i]]);
-          for (auto it2 = ds->begin(); it2 != ds->end(); it2++) {
-            unsigned index = * it2;
+          for (auto index : it->elements[arraysInFactor[i]]) {
             (* tempPtr)[index] = tempValues[i][index];
           }
         } else {

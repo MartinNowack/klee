@@ -11,6 +11,7 @@
 
 #include <bits/functional_hash.h>
 #include <cassert>
+#include <iterator>
 #include <map>
 #include <set>
 #include <utility>
@@ -44,45 +45,75 @@ uint64_t ConstraintSetView::next_free_position = 1;
 uint64_t ConstraintSetView::version_cntr = 1;
 
 void ConstraintSetView::extractAndResetConstraints(ConstraintSetView &other) {
-  constraints.swap(other.constraints);
+  independence_cache.swap(other.independence_cache);
   origPosition.swap(other.origPosition);
-  std::swap(trackPos, other.trackPos);
-  //  deletedPositions.swap(other.deletedPositions);
-  //  std::swap(uid_cntr, other.uid_cntr);
-  //  std::swap(next_free_position, other.next_free_position);
 }
 
 ConstraintSetView ConstraintSetView::clone() const {
   return ConstraintSetView(*this);
 }
+ConstraintSetView ConstraintSetView::filterClone(const ref<Expr> &e) const {
+  IndependentElementSet es(e);
+  ConstraintSetView result;
 
-ConstraintSetView::ConstraintSetView() : trackPos(false) {}
-
-ConstraintSetView::ConstraintSetView(const ConstraintSetView &csv) {
-  constraints.reserve(csv.constraints.size());
-  for (auto cs : csv.constraints)
-    constraints.emplace_back(cs);
-  trackPos = csv.trackPos;
-  origPosition.reserve(csv.origPosition.size());
-  for (auto pos : csv.origPosition)
-    origPosition.emplace_back(pos);
-  //    for(auto elem: csv.independence_cache)
-  //     independence_cache.insert(std::make_pair(std::make_uniqe_ptr));
+  for (size_t i = 0, j = independence_cache.size(); i < j; ++i) {
+    if (!independence_cache[i].intersects(es))
+      continue;
+    result.independence_cache.push_back(independence_cache[i].clone());
+    result.origPosition.push_back(origPosition[i]);
+  }
+  return result;
 }
 
+ConstraintSetView::ConstraintSetView() {}
+
 bool ConstraintSetView::operator==(const ConstraintSetView &other) const {
-  return constraints == other.constraints;
+  return independence_cache == other.independence_cache;
 }
 
 void ConstraintSetView::dump() const {
-  size_t i = 0;
-  for (const_iterator it = constraints.begin(), itE = constraints.end();
-       it != itE; ++it) {
-    llvm::errs() << "{" << origPosition[i].constraint_id << "/"
-                 << origPosition[i].constraint_width << "}\n";
-    ++i;
+  for (auto it = begin(), itE = end(); it != itE; ++it) {
+    auto origPosition = getPositions(it);
+    llvm::errs() << "{" << origPosition.constraint_id << "/"
+                 << origPosition.constraint_width << "}\n";
     (*it)->dump();
   }
+}
+
+inline void ConstraintSetView::orderIndependenceSetByConstraintPosition() {
+  // Sort constraints by origPosition
+  for (size_t i = 0, j = independence_cache.size(); i < j; ++i) {
+    auto it =
+        std::is_sorted_until(origPosition[i].begin(), origPosition[i].end(),
+                             ConstraintPositionLess());
+
+    while (it != origPosition[i].end()) {
+      auto new_pos = std::lower_bound(origPosition[i].begin(), it, *it,
+                                      ConstraintPositionLess());
+
+      auto idx_old = it - origPosition[i].begin();
+      auto idx_new = new_pos - origPosition[i].begin();
+
+      std::rotate(new_pos, it, it + 1);
+      std::rotate(independence_cache[i].exprs.begin() + idx_new,
+                  independence_cache[i].exprs.begin() + idx_old,
+                  independence_cache[i].exprs.begin() + idx_old + 1);
+
+      // continue checking the remaining array
+      it =
+          std::is_sorted_until(origPosition[i].begin() + idx_new,
+                               origPosition[i].end(), ConstraintPositionLess());
+    }
+  }
+}
+
+inline ConstraintSetView::ConstraintSetView(const ConstraintSetView &csv)
+    : origPosition(csv.origPosition) {
+  independence_cache.reserve(csv.independence_cache.size());
+  std::for_each(csv.independence_cache.begin(), csv.independence_cache.end(),
+                [=](IndependentElementSet &ies) {
+    independence_cache.push_back(ies.clone());
+  });
 }
 
 class ExprReplaceVisitor : public ExprVisitor {
@@ -158,9 +189,7 @@ bool ConstraintManager::rewriteConstraints(ExprVisitor &visitor) {
   bool changed = false;
 
   constraintSetView.extractAndResetConstraints(old);
-  for (ConstraintSetView::iterator it = old.constraints.begin(),
-                                   ie = old.constraints.end();
-       it != ie; ++it) {
+  for (auto it = old.begin(), ie = old.end(); it != ie; ++it) {
     ref<Expr> &ce = *it;
     ref<Expr> e = visitor.visit(ce);
 
@@ -181,24 +210,111 @@ bool ConstraintManager::rewriteConstraints(ExprVisitor &visitor) {
   return changed;
 }
 
+bool ConstraintSetView::empty() const { return independence_cache.empty(); }
+
+ConstraintSetView::iterator ConstraintSetView::begin() const {
+  return ConstraintSetView::iterator(this, 0, 0);
+}
+ConstraintSetView::iterator ConstraintSetView::end() const {
+  return ConstraintSetView::iterator(this, this->independence_cache.size(), 0);
+}
+
+ConstraintSetView::iterator ConstraintSetView::begin(ref<Expr> &e) const {
+  return ConstraintSetView::iterator(this, 0, 0, e);
+}
+
+ConstraintSetView::iterator ConstraintSetView::end(ref<Expr> &e) const {
+  return ConstraintSetView::iterator(this, this->independence_cache.size(), 0,
+                                     e);
+}
+
+void ConstraintSetView::addExprAndUpdateIndependentSet(
+    ref<Expr> e, ConstraintPosition &&positions) {
+  // check every view
+  IndependentElementSet new_set(e);
+  std::vector<size_t> possibleSets;
+  size_t idx = 0;
+  for (auto &other_set : independence_cache) {
+    if (other_set.intersects(new_set)) {
+      possibleSets.push_back(idx);
+    }
+    ++idx;
+  }
+  // We could not add the constraint to an existing set
+  // Add it as a new set
+  if (possibleSets.empty()) {
+    independence_cache.emplace_back(std::move(new_set));
+    origPosition.emplace_back(std::vector<ConstraintPosition>());
+    origPosition.back().emplace_back(positions);
+    return;
+  }
+
+  std::vector<ConstraintPosition> new_positions;
+  new_positions.emplace_back(positions);
+
+  // The constraint is dependent on one or more sets
+  // merge those sets to one big set
+  while (possibleSets.size() > 1) {
+    size_t current_idx = possibleSets.back();
+    possibleSets.pop_back();
+    new_set.add(independence_cache[current_idx]);
+    independence_cache.erase(independence_cache.begin() + current_idx);
+    // Save positions
+    new_positions.insert(
+        new_positions.end(),
+        std::make_move_iterator(origPosition[current_idx].begin()),
+        std::make_move_iterator(origPosition[current_idx].end()));
+    origPosition.erase(origPosition.begin() + current_idx);
+  }
+  independence_cache[possibleSets[0]].add(new_set);
+  origPosition[possibleSets[0]].insert(
+      origPosition[possibleSets[0]].end(),
+      std::make_move_iterator(new_positions.begin()),
+      std::make_move_iterator(new_positions.end()));
+}
+
+ConstraintPosition ConstraintSetView::getPositions(
+    const ConstraintSetView::const_iterator &it) const {
+  return origPosition[it.iset_idx][it.iset_expr_idx];
+}
+
+void ConstraintSetView::clear() {
+  independence_cache.clear();
+  origPosition.clear();
+}
+
+void ConstraintSetView::push_back(ref<Expr> e, ConstraintPosition &&positions) {
+  assert(!e.isNull());
+  addExprAndUpdateIndependentSet(e, std::move(positions));
+}
+
+size_t ConstraintSetView::size() const {
+  size_t total = 0;
+  for (auto &cache_item : independence_cache)
+    total += cache_item.exprs.size();
+  return total;
+}
+
+////
+
 ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e,
                                           const ConstraintSetView &view) {
   if (isa<ConstantExpr>(e))
     return e;
 
+  // We can only simplify an expression by other constraints, if they have at
+  // least one variable in common
+
   std::map<ref<Expr>, ref<Expr> > equalities;
 
-  for (ConstraintSetView::constraints_ty::const_iterator
-           it = view.constraints.begin(),
-           ie = view.constraints.end();
-       it != ie; ++it) {
-    if (const EqExpr *ee = dyn_cast<EqExpr>(*it))
+  std::for_each(view.begin(e), view.begin(e), [&equalities](ref<Expr> e) {
+    if (const EqExpr *ee = dyn_cast<EqExpr>(e))
       if (isa<ConstantExpr>(ee->left)) {
         equalities.insert(std::make_pair(ee->right, ee->left));
-        continue;
+        return;
       }
-    equalities.insert(std::make_pair(*it, ConstantExpr::alloc(1, Expr::Bool)));
-  }
+    equalities.insert(std::make_pair(e, ConstantExpr::alloc(1, Expr::Bool)));
+  });
 
   return ExprReplaceVisitor2(equalities).visit(e);
 }
@@ -235,6 +351,7 @@ void ConstraintManager::addConstraintInternal(ref<Expr> e,
     addConstraintInternal(
         be->left,
         ConstraintPosition(left_id, left_node_count, position.version));
+
     addConstraintInternal(
         be->right, ConstraintPosition(
                        right_id, position.constraint_width - left_node_count,
@@ -267,28 +384,6 @@ void ConstraintManager::addConstraintInternal(ref<Expr> e,
   }
 }
 
-ConstraintPosition ConstraintSetView::getPositions(const_iterator it) const {
-  assert(trackPos || constraints.empty());
-  return origPosition[it - constraints.begin()];
-}
-
-ConstraintPosition ConstraintSetView::getPositions(size_t pos) const {
-  assert(trackPos || constraints.empty());
-  return origPosition[pos];
-}
-
-void ConstraintSetView::push_back(ref<Expr> e, ConstraintPosition &&positions) {
-  assert(trackPos || constraints.empty());
-  trackPos = true;
-  constraints.push_back(e);
-  origPosition.push_back(std::move(positions));
-}
-
-void ConstraintSetView::push_nontracking(ref<Expr> e) {
-  assert(!trackPos || origPosition.empty());
-  trackPos = false;
-  constraints.push_back(e);
-}
 
 void ConstraintManager::addConstraint(ref<Expr> e) {
   TimerStatIncrementer t(stats::addConstraintTime);
@@ -308,28 +403,7 @@ void ConstraintManager::addConstraint(ref<Expr> e) {
   addConstraintInternal(
       e, ConstraintPosition(expression_position, count_nodes, 0));
 
-  // Sort constraints by origPosition
-  auto it = std::is_sorted_until(constraintSetView.origPosition.begin(),
-                                 constraintSetView.origPosition.end(),
-                                 ConstraintPositionLess());
-
-  while (it != constraintSetView.origPosition.end()) {
-    auto new_pos = std::lower_bound(constraintSetView.origPosition.begin(), it,
-                                    *it, ConstraintPositionLess());
-
-    auto idx_old = it - constraintSetView.origPosition.begin();
-    auto idx_new = new_pos - constraintSetView.origPosition.begin();
-
-    std::rotate(new_pos, it, it + 1);
-    std::rotate(constraintSetView.constraints.begin() + idx_new,
-                constraintSetView.constraints.begin() + idx_old,
-                constraintSetView.constraints.begin() + idx_old + 1);
-
-    // continue checking the remaining array
-    it = std::is_sorted_until(constraintSetView.origPosition.begin() + idx_new,
-                              constraintSetView.origPosition.end(),
-                              ConstraintPositionLess());
-  }
+  constraintSetView.orderIndependenceSetByConstraintPosition();
 }
 
 void SimpleConstraintManager::push_back(ref<Expr> expr) {
@@ -338,27 +412,12 @@ void SimpleConstraintManager::push_back(ref<Expr> expr) {
   constraintSetView.push_back(expr, ConstraintPosition(0, 0, 0));
 }
 
-void SimpleConstraintManager::push_back_nontracking(ref<Expr> expr) {
-  // We explicitly initialize the constraint position to 0
-  // this should not be used to track constraints
-  constraintSetView.push_nontracking(expr);
-}
-
 void ReferencingConstraintManager::push_back(ref<Expr> expr) {
-  const Expr *p = expr.get();
-  size_t pos = 0;
-  for (const auto &e : oldView.constraints) {
-    if (e.get() == p) {
-      constraintSetView.push_back(expr, oldView.getPositions(pos));
-      return;
-    }
-    ++pos;
-  }
-  assert(0 && "Expression to be add not found in previous one");
+
+  auto it_pos = std::find(oldView.begin(expr), oldView.end(expr), expr);
+  assert(it_pos != oldView.end(expr) && "Constraint was not added beforehand");
+
+  constraintSetView.push_back(expr, oldView.getPositions(it_pos));
 }
 
-void SimpleConstraintManager::clear() {
-  constraintSetView.constraints.clear();
-  constraintSetView.origPosition.clear();
-  //    constraintSetView.next_free_position = 0;
-}
+void SimpleConstraintManager::clear() { constraintSetView.clear(); }
