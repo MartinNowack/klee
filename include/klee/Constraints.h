@@ -10,18 +10,16 @@
 #ifndef KLEE_CONSTRAINTS_H
 #define KLEE_CONSTRAINTS_H
 
-#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
-#include <memory>
+#include <type_traits>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
-#include "Expr.h"
+#include "klee/Expr.h"
 #include "klee/util/IndependentElementSet.h"
-#include "util/Ref.h"
+#include "klee/util/Ref.h"
 
 namespace klee {
 
@@ -32,7 +30,6 @@ class Expr;
 class ExprVisitor;
 class ReferencingConstraintManager;
 class SimpleConstraintManager;
-class IndependentElementSet;
 
 struct ConstraintPosition {
   // Unique ID of the constraint
@@ -49,7 +46,6 @@ struct ConstraintPosition {
                      uint64_t version);
   void dump() const;
 };
-}
 
 struct ConstraintPositionHash {
   size_t operator()(const klee::ConstraintPosition &e) const {
@@ -80,72 +76,78 @@ struct ConstraintPositionLess {
   }
 };
 
-namespace klee {
+template <bool> class ConstraintSetIterator;
+
 /**
  * @brief Container to keep all constraints
  */
 class ConstraintSetView {
-  friend ConstraintManager;
-  friend SimpleConstraintManager;
-  friend ReferencingConstraintManager;
-
 public:
-  typedef std::vector<ref<Expr> > constraints_ty;
-  typedef std::vector<ref<Expr> >::const_iterator constraint_iterator;
+  typedef ConstraintSetIterator<false> iterator;
+  typedef ConstraintSetIterator<true> const_iterator;
 
-  typedef constraints_ty::iterator iterator;
-  typedef constraints_ty::const_iterator const_iterator;
+  bool empty() const;
+  iterator begin() const;
+  iterator end() const;
+  size_t size() const;
 
-  bool empty() const { return constraints.empty(); }
-  constraint_iterator begin() const { return constraints.cbegin(); }
-  constraint_iterator end() const { return constraints.cend(); }
-  size_t size() const { return constraints.size(); }
+  iterator begin(ref<Expr> &e) const;
+  iterator end(ref<Expr> &e) const;
 
-  ConstraintSetView();
+  std::vector<IndependentElementSet>::iterator iset_begin() const {
+    return independence_cache.begin();
+  }
+  std::vector<IndependentElementSet>::iterator iset_end() const {
+    return independence_cache.end();
+  }
 
-public:
-  ConstraintSetView &operator=(const ConstraintSetView &) = delete;
-
-  ConstraintSetView(ConstraintSetView &&) = default;
-  ConstraintSetView &operator=(ConstraintSetView &&) = default;
+  ConstraintPosition getPositions(const const_iterator &it) const;
 
   bool operator==(const ConstraintSetView &other) const;
 
   void dump() const;
 
+  // XXX private?
+  ConstraintSetView();
+  ConstraintSetView &operator=(const ConstraintSetView &) = delete;
+
+  ConstraintSetView(ConstraintSetView &&) = default;
+  ConstraintSetView &operator=(ConstraintSetView &&) = default;
+
   ConstraintSetView clone() const;
+  // XXX create referencing set view instead
+  ConstraintSetView filterClone(const ref<Expr> &) const;
 
 private:
   ConstraintSetView(const ConstraintSetView &csv);
+
   void push_back(ref<Expr> e, ConstraintPosition &&positions);
-  void push_nontracking(ref<Expr> e);
+  void addExprAndUpdateIndependentSet(ref<Expr> e,
+                                      ConstraintPosition &&positions);
+
+  void clear();
 
   /**
    * Moves constraints to other but keeps state.
    */
   void extractAndResetConstraints(ConstraintSetView &other);
 
-public:
-  constraints_ty constraints;
-
-private:
+  void orderIndependenceSetByConstraintPosition();
   static uint64_t next_free_position;
   static uint64_t version_cntr;
 
-  // Tracks origin position for each set
-  // First: the origin position, second unique id
-  std::vector<ConstraintPosition> origPosition;
-
-  // Indicator if positions are tracked by this view or not
-  bool trackPos;
+  // Tracks origin position for each constraint for each independence set
+  std::vector<std::vector<ConstraintPosition> > origPosition;
 
   // Track independence sets
-  std::vector<std::pair<IndependentElementSet, std::vector<ref<Expr> > > >
-      independence_cache;
+  // Sets are disjunct
+  mutable std::vector<IndependentElementSet> independence_cache;
 
-public:
-  ConstraintPosition getPositions(const_iterator it) const;
-  ConstraintPosition getPositions(size_t pos) const;
+  friend ConstraintManager;
+  friend SimpleConstraintManager;
+  friend ReferencingConstraintManager;
+  friend ConstraintSetIterator<true>;
+  friend ConstraintSetIterator<false>;
 };
 
 /**
@@ -178,6 +180,95 @@ protected:
 };
 
 /**
+ * @brief Iterator class to iterate over constraints of a constraint set
+ */
+template <bool is_constant> class ConstraintSetIterator {
+public:
+  typedef std::forward_iterator_tag iterator_category;
+  typedef typename std::conditional<is_constant, const ref<Expr>,
+                                    ref<Expr> >::type value_type;
+  typedef ptrdiff_t difference_type;
+  typedef typename std::conditional<is_constant, const ref<Expr> *,
+                                    ref<Expr> *>::type pointer;
+  typedef typename std::conditional<is_constant, const ref<Expr> &,
+                                    ref<Expr> &>::type reference;
+
+  ConstraintSetIterator(const ConstraintSetView *csv_, size_t iset_idx_,
+                        size_t iset_expr_idx_)
+      : csv(csv_), iset_idx(iset_idx_), iset_expr_idx(iset_expr_idx_),
+        e(nullptr) {}
+
+  ConstraintSetIterator(const ConstraintSetView *csv_, size_t iset_idx_,
+                        size_t iset_expr_idx_, ref<Expr> ex)
+      : csv(csv_), iset_idx(iset_idx_), iset_expr_idx(iset_expr_idx_), e(ex) {
+    currentIndepSet.add(IndependentElementSet(ex));
+    auto indep_idx_end = csv->independence_cache.size();
+
+    // search for a independent set which matches
+    for (; iset_idx < indep_idx_end; ++iset_idx)
+      if (currentIndepSet.intersects(csv->independence_cache[iset_idx]))
+        break;
+  }
+
+  /**
+   * Copy constructor. Allows for implicit conversion from a regular iterator to
+   * a const_iterator
+   */
+  ConstraintSetIterator(const ConstraintSetIterator<false> &other)
+      : csv(other.csv), currentIndepSet(other.currentIndepSet.clone()),
+        iset_idx(other.iset_idx), iset_expr_idx(other.iset_expr_idx) {}
+
+  bool operator!=(const ConstraintSetIterator &other) const {
+    return (iset_idx != other.iset_idx || iset_expr_idx != other.iset_expr_idx);
+  }
+
+  reference operator*() const {
+    assert(iset_idx < csv->independence_cache.size());
+    assert(iset_expr_idx < csv->independence_cache[iset_idx].exprs.size());
+
+    return csv->independence_cache[iset_idx].exprs[iset_expr_idx];
+  }
+
+  ConstraintSetIterator &operator++() {
+    ++iset_expr_idx;
+    // check if the end of this set is reached, and the next one has to be
+    // selected
+    if (iset_expr_idx >= csv->independence_cache[iset_idx].exprs.size()) {
+      // jump to the next independence cache item
+      // and start from the beginning
+      iset_expr_idx = 0;
+      if (!e.isNull()) {
+        // search for a independent set which matches the given expression
+        auto indep_idx_end = csv->independence_cache.size();
+        for (; iset_idx < indep_idx_end; ++iset_idx)
+          if (currentIndepSet.intersects(csv->independence_cache[iset_idx]))
+            break;
+      } else
+        ++iset_idx;
+    }
+    return *this;
+  }
+
+  ConstraintSetIterator operator++(int) {
+    // Use operator++()
+    const ConstraintSetIterator old(*this);
+    ++(*this);
+    return old;
+  }
+
+private:
+  const ConstraintSetView *csv;
+  IndependentElementSet currentIndepSet;
+
+  size_t iset_idx;
+  size_t iset_expr_idx;
+
+  ref<Expr> e;
+
+  friend ConstraintSetView;
+  friend class ConstraintSetIterator<true>;
+};
+/**
  * Can add constraints without position tracking
  */
 class SimpleConstraintManager : public ConstraintManager {
@@ -186,7 +277,6 @@ public:
 
   // Add constraint without simplification
   void push_back(ref<Expr> expr);
-  void push_back_nontracking(ref<Expr> expr);
 
   SimpleConstraintManager(const SimpleConstraintManager &) = delete;
 

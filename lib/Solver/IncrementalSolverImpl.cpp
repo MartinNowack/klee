@@ -16,6 +16,7 @@
 #include "klee/util/ExprVisitor.h"
 
 #include <memory>
+#include <unordered_set>
 
 namespace klee {
 
