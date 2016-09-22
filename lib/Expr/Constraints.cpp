@@ -307,7 +307,7 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e,
 
   std::map<ref<Expr>, ref<Expr> > equalities;
 
-  std::for_each(view.begin(e), view.begin(e), [&equalities](ref<Expr> e) {
+  std::for_each(view.begin(e), view.end(e), [&equalities](ref<Expr> e) {
     if (const EqExpr *ee = dyn_cast<EqExpr>(e))
       if (isa<ConstantExpr>(ee->left)) {
         equalities.insert(std::make_pair(ee->right, ee->left));
