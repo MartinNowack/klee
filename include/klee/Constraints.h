@@ -238,6 +238,7 @@ public:
       // and start from the beginning
       iset_expr_idx = 0;
       if (!e.isNull()) {
+	++iset_idx;
         // search for a independent set which matches the given expression
         auto indep_idx_end = csv->independence_cache.size();
         for (; iset_idx < indep_idx_end; ++iset_idx)
