@@ -49,6 +49,30 @@ void ConstraintSetView::extractAndResetConstraints(ConstraintSetView &other) {
   origPosition.swap(other.origPosition);
 }
 
+void ConstraintSetView::addNoneIntersectionExpressions(ConstraintSetView &other) {
+  // check if we can copy all
+  if (independence_cache.empty()) {
+    independence_cache = std::move(other.independence_cache);
+    origPosition = std::move(other.origPosition);
+    return;
+  }
+  // Analyze which independence sets do not interleave
+  std::vector<size_t> indices;
+  for (size_t i = 0, e = other.independence_cache.size(); i != e; ++i) {
+    for (auto & item:independence_cache){
+      if (!item.intersects(other.independence_cache[i]))
+        indices.push_back(i);
+    }
+  }
+
+  // Now, move those set to this set
+  for (auto index: indices){
+    independence_cache.push_back(std::move(other.independence_cache[index]));
+    origPosition.push_back(std::move(other.origPosition[index]));
+  }
+}
+
+
 ConstraintSetView ConstraintSetView::clone() const {
   return ConstraintSetView(*this);
 }
@@ -184,12 +208,15 @@ void ConstraintPosition::dump() const {
   llvm::errs() << "(" << constraint_id << ":" << constraint_width << ")\n";
 }
 
-bool ConstraintManager::rewriteConstraints(ExprVisitor &visitor) {
+bool ConstraintManager::rewriteConstraints(ExprVisitor &visitor, ref<Expr> e) {
   ConstraintSetView old;
   bool changed = false;
 
   constraintSetView.extractAndResetConstraints(old);
-  for (auto it = old.begin(), ie = old.end(); it != ie; ++it) {
+
+  // XXX remember indep sets which were not used
+  // they can be transfered immediately
+  for (auto it = old.begin(e), ie = old.end(e); it != ie; ++it) {
     ref<Expr> &ce = *it;
     ref<Expr> e = visitor.visit(ce);
 
@@ -206,6 +233,8 @@ bool ConstraintManager::rewriteConstraints(ExprVisitor &visitor) {
       constraintSetView.push_back(ce, std::move(positions));
     }
   }
+
+  constraintSetView.addNoneIntersectionExpressions(old);
 
   return changed;
 }
@@ -379,7 +408,7 @@ void ConstraintManager::addConstraintInternal(ref<Expr> new_constraint,
         BinaryExpr *be = cast<BinaryExpr>(currentItem);
         if (isa<ConstantExpr>(be->left)) {
           ExprReplaceVisitor visitor(be->right, be->left);
-          rewriteConstraints(visitor);
+          rewriteConstraints(visitor, be->right);
         }
       }
       // update the number of queries

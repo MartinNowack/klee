@@ -132,6 +132,13 @@ private:
    */
   void extractAndResetConstraints(ConstraintSetView &other);
 
+  /**
+   * Moves constraints from other view, which do not intersect with
+   * constraints from this set.
+   *
+   */
+  void addNoneIntersectionExpressions(ConstraintSetView &other);
+
   void orderIndependenceSetByConstraintPosition();
   static uint64_t next_free_position;
   static uint64_t version_cntr;
@@ -174,7 +181,7 @@ public:
 protected:
   ConstraintSetView &constraintSetView;
   // returns true iff the constraints were modified
-  bool rewriteConstraints(ExprVisitor &visitor);
+  bool rewriteConstraints(ExprVisitor &visitor, ref<Expr> e);
 
   void addConstraintInternal(ref<Expr> e, ConstraintPosition &&position);
 };
