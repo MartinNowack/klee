@@ -196,18 +196,35 @@ public:
   ConstraintSetIterator(const ConstraintSetView *csv_, size_t iset_idx_,
                         size_t iset_expr_idx_)
       : csv(csv_), iset_idx(iset_idx_), iset_expr_idx(iset_expr_idx_),
-        e(nullptr) {}
+        e(nullptr) {
+    // set to the number entries of independence sets we have
+    iset_idx_max = csv->independence_cache.size();
+
+    // Update the max number of entries in the selected independence set
+    // if it exists
+    if (iset_idx < iset_idx_max)
+      iset_expr_idx_max = csv->independence_cache[iset_idx].exprs.size();
+    else
+      iset_expr_idx_max = 0;
+  }
 
   ConstraintSetIterator(const ConstraintSetView *csv_, size_t iset_idx_,
                         size_t iset_expr_idx_, ref<Expr> ex)
       : csv(csv_), iset_idx(iset_idx_), iset_expr_idx(iset_expr_idx_), e(ex) {
     currentIndepSet.add(IndependentElementSet(ex));
-    auto indep_idx_end = csv->independence_cache.size();
+    iset_idx_max = csv->independence_cache.size();
 
     // search for a independent set which matches
-    for (; iset_idx < indep_idx_end; ++iset_idx)
+    for (; iset_idx < iset_idx_max; ++iset_idx)
       if (currentIndepSet.intersects(csv->independence_cache[iset_idx]))
         break;
+
+    // Update the max number of entries in the selected independence set
+    // if it exists
+    if (iset_idx < iset_idx_max)
+      iset_expr_idx_max = csv->independence_cache[iset_idx].exprs.size();
+    else
+      iset_expr_idx_max = 0;
   }
 
   /**
@@ -216,15 +233,17 @@ public:
    */
   ConstraintSetIterator(const ConstraintSetIterator<false> &other)
       : csv(other.csv), currentIndepSet(other.currentIndepSet.clone()),
-        iset_idx(other.iset_idx), iset_expr_idx(other.iset_expr_idx) {}
+        iset_idx(other.iset_idx), iset_expr_idx(other.iset_expr_idx),
+        iset_idx_max(other.iset_idx_max), iset_expr_idx_max(other.iset_expr_idx_max),
+        e(other.e){}
 
   bool operator!=(const ConstraintSetIterator &other) const {
     return (iset_idx != other.iset_idx || iset_expr_idx != other.iset_expr_idx);
   }
 
   reference operator*() const {
-    assert(iset_idx < csv->independence_cache.size());
-    assert(iset_expr_idx < csv->independence_cache[iset_idx].exprs.size());
+    assert(iset_idx < iset_idx_max);
+    assert(iset_expr_idx < iset_expr_idx_max);
 
     return csv->independence_cache[iset_idx].exprs[iset_expr_idx];
   }
@@ -233,19 +252,23 @@ public:
     ++iset_expr_idx;
     // check if the end of this set is reached, and the next one has to be
     // selected
-    if (iset_expr_idx >= csv->independence_cache[iset_idx].exprs.size()) {
+    if (iset_expr_idx >= iset_expr_idx_max) {
       // jump to the next independence cache item
       // and start from the beginning
       iset_expr_idx = 0;
       if (!e.isNull()) {
-	++iset_idx;
+        ++iset_idx;
         // search for a independent set which matches the given expression
-        auto indep_idx_end = csv->independence_cache.size();
-        for (; iset_idx < indep_idx_end; ++iset_idx)
+        for (; iset_idx < iset_idx_max; ++iset_idx)
           if (currentIndepSet.intersects(csv->independence_cache[iset_idx]))
             break;
       } else
         ++iset_idx;
+      // update the max counter fpr expressions of the next indepencence set
+      if (iset_idx < iset_idx_max)
+        iset_expr_idx_max = csv->independence_cache[iset_idx].exprs.size();
+      else
+        iset_expr_idx_max = 0;
     }
     return *this;
   }
@@ -263,6 +286,9 @@ private:
 
   size_t iset_idx;
   size_t iset_expr_idx;
+
+  size_t iset_idx_max;
+  size_t iset_expr_idx_max;
 
   ref<Expr> e;
 
