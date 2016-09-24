@@ -323,65 +323,76 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) {
   return ConstraintManager::simplifyExpr(e, constraintSetView);
 }
 
-void ConstraintManager::addConstraintInternal(ref<Expr> e,
-                                              ConstraintPosition &&position) {
-  // rewrite any known equalities and split Ands into different conjuncts
-  switch (e->getKind()) {
-  case Expr::Constant:
-    assert(cast<ConstantExpr>(e)->isTrue() &&
-           "attempt to add invalid (false) constraint");
-    //    constraintSetView.deletedPositions.insert(position);
-    break;
+void ConstraintManager::addConstraintInternal(ref<Expr> new_constraint,
+                                              ConstraintPosition &&new_position) {
 
-  // split to enable finer grained independence and other optimizations
-  case Expr::And: {
-    BinaryExpr *be = cast<BinaryExpr>(e);
+  std::vector<std::pair<ref<Expr>, ConstraintPosition> > working_stack;
+  working_stack.push_back(std::make_pair(new_constraint, new_position));
 
-    // Find out the post-order number of the left expression,
-    // which is the number of expressions in the left tree
-    ExprCountVisitor leftTreeCountingVisitor;
-    leftTreeCountingVisitor.visit(be->left);
-    uint64_t left_node_count = leftTreeCountingVisitor.getCounter();
+  ref<Expr> currentItem;
+  while(!working_stack.empty()) {
+    auto w = working_stack.back();
+    working_stack.pop_back();
+    currentItem = w.first;
+    auto position = w.second;
 
-    // Using the node of the left tree and the whole tree,
-    // we can calculate the absolute number
-    uint64_t left_id =
-        position.constraint_id - position.constraint_width + left_node_count;
-    uint64_t right_id = position.constraint_id - 1;
-    addConstraintInternal(
-        be->left,
-        ConstraintPosition(left_id, left_node_count, position.version));
+    // rewrite any known equalities and split Ands into different conjuncts
+    switch (currentItem->getKind()) {
+    case Expr::Constant:
+      assert(cast<ConstantExpr>(currentItem)->isTrue() &&
+             "attempt to add invalid (false) constraint");
+      //    constraintSetView.deletedPositions.insert(position);
+      break;
 
-    addConstraintInternal(
-        be->right, ConstraintPosition(
-                       right_id, position.constraint_width - left_node_count,
-                       position.version));
-    break;
-  }
+    // split to enable finer grained independence and other optimizations
+    case Expr::And: {
+      BinaryExpr *be = cast<BinaryExpr>(currentItem);
 
-  case Expr::Eq: {
-    if (RewriteEqualities) {
-      // XXX: should profile the effects of this and the overhead.
-      // traversing the constraints looking for equalities is hardly the
-      // slowest thing we do, but it is probably nicer to have a
-      // ConstraintSet ADT which efficiently remembers obvious patterns
-      // (byte-constant comparison).
-      BinaryExpr *be = cast<BinaryExpr>(e);
-      if (isa<ConstantExpr>(be->left)) {
-        ExprReplaceVisitor visitor(be->right, be->left);
-        rewriteConstraints(visitor);
-      }
+      // Find out the post-order number of the left expression,
+      // which is the number of expressions in the left tree
+      ExprCountVisitor leftTreeCountingVisitor;
+      leftTreeCountingVisitor.visit(be->left);
+      uint64_t left_node_count = leftTreeCountingVisitor.getCounter();
+
+      // Using the node of the left tree and the whole tree,
+      // we can calculate the absolute number
+      uint64_t left_id =
+          position.constraint_id - position.constraint_width + left_node_count;
+      uint64_t right_id = position.constraint_id - 1;
+
+      working_stack.push_back(std::make_pair(be->left,
+          ConstraintPosition(left_id, left_node_count, position.version)));
+      working_stack.push_back(std::make_pair(be->right,
+          ConstraintPosition(right_id, position.constraint_width - left_node_count,
+          position.version)));
+
+      break;
     }
-    // update the number of queries
 
-    constraintSetView.push_back(e, std::move(position));
-    break;
+    case Expr::Eq: {
+      if (RewriteEqualities) {
+        // XXX: should profile the effects of this and the overhead.
+        // traversing the constraints looking for equalities is hardly the
+        // slowest thing we do, but it is probably nicer to have a
+        // ConstraintSet ADT which efficiently remembers obvious patterns
+        // (byte-constant comparison).
+        BinaryExpr *be = cast<BinaryExpr>(currentItem);
+        if (isa<ConstantExpr>(be->left)) {
+          ExprReplaceVisitor visitor(be->right, be->left);
+          rewriteConstraints(visitor);
+        }
+      }
+      // update the number of queries
+      constraintSetView.push_back(currentItem, std::move(position));
+      break;
+    }
+
+    default:
+      constraintSetView.push_back(currentItem, std::move(position));
+      break;
+    }
   }
 
-  default:
-    constraintSetView.push_back(e, std::move(position));
-    break;
-  }
 }
 
 
