@@ -14,6 +14,7 @@
 #include "klee/Expr.h"
 #include "klee/Constraints.h"
 #include "klee/util/ExprVisitor.h"
+#include "klee/TimerStatIncrementer.h"
 
 #include <memory>
 #include <unordered_set>
@@ -358,6 +359,8 @@ size_t IncrementalSolverImpl::selectBestSolver(
 }
 
 Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
+
+  TimerStatIncrementer t(stats::queryIncCalculationTime);
   // avoid over approximation, if there aren't any constraints,
   // we can't save anything
   if (q.constraints.empty()) {

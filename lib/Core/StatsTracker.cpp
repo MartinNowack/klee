@@ -430,6 +430,7 @@ void StatsTracker::writeStatsHeader() {
              << "'ForkTime',"
              << "'ResolveTime',"
              << "'Incremental',"
+             << "'IncrementalCalcTime',"
 #ifdef DEBUG
              << "'ArrayHashTime',"
 #endif
@@ -466,6 +467,7 @@ void StatsTracker::writeStatsLine() {
              << "," << stats::forkTime / 1000000.
              << "," << stats::resolveTime / 1000000.
              << "," << stats::queryIncremental
+             << "," << stats::queryIncCalculationTime / 1000000.
 #ifdef DEBUG
              << "," << stats::arrayHashTime / 1000000.
 #endif
