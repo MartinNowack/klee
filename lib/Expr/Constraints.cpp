@@ -208,33 +208,55 @@ void ConstraintPosition::dump() const {
   llvm::errs() << "(" << constraint_id << ":" << constraint_width << ")\n";
 }
 
-bool ConstraintManager::rewriteConstraints(ExprVisitor &visitor, ref<Expr> e) {
+bool ConstraintManager::rewriteConstraints(ExprVisitor &visitor, ref<Expr> e_) {
   ConstraintSetView old;
   bool changed = false;
 
   constraintSetView.extractAndResetConstraints(old);
+  IndependentElementSet is(e_);
+  size_t index = 0;
+  std::vector<size_t> to_copy;
+  for (auto iset_it = old.iset_begin(), iset_itE = old.iset_end();
+       iset_it != iset_itE; ++iset_it, ++index) {
+    if (!is.intersects(*iset_it)) {
+      to_copy.push_back(index);
+      continue;
+    }
+    size_t expr_idx = 0;
+    for (auto it = iset_it->exprs.begin(), ie = iset_it->exprs.end(); it != ie;
+         ++it, ++expr_idx) {
+      ref<Expr> &ce = *it;
+      ref<Expr> e = visitor.visit(ce);
 
-  // XXX remember indep sets which were not used
-  // they can be transfered immediately
-  for (auto it = old.begin(e), ie = old.end(e); it != ie; ++it) {
-    ref<Expr> &ce = *it;
-    ref<Expr> e = visitor.visit(ce);
-
-    auto positions = old.getPositions(it);
-
-    if (e != ce) {
-      // enable further reductions
-      addConstraintInternal(
-          e, ConstraintPosition(positions.constraint_id,
-                                positions.constraint_width,
-                                constraintSetView.version_cntr++));
-      changed = true;
-    } else {
-      constraintSetView.push_back(ce, std::move(positions));
+      auto positions = old.origPosition[index][expr_idx];
+      if (e != ce) {
+        // enable further reductions
+        addConstraintInternal(
+            e, ConstraintPosition(positions.constraint_id,
+                                  positions.constraint_width,
+                                  constraintSetView.version_cntr++));
+        changed = true;
+      } else {
+        constraintSetView.push_back(ce, ConstraintPosition(positions));
+      }
     }
   }
 
-  constraintSetView.addNoneIntersectionExpressions(old);
+  // check if we can copy all
+  if (constraintSetView.independence_cache.empty()) {
+    constraintSetView.independence_cache = std::move(old.independence_cache);
+    constraintSetView.origPosition = std::move(old.origPosition);
+
+    return changed;
+  }
+  while (!to_copy.empty()) {
+    auto index = to_copy.back();
+    to_copy.pop_back();
+    constraintSetView.independence_cache.push_back(
+        std::move(old.independence_cache[index]));
+    constraintSetView.origPosition.push_back(
+        std::move(old.origPosition[index]));
+  }
 
   return changed;
 }
