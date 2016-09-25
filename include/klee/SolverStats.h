@@ -32,7 +32,7 @@ namespace stats {
   extern Statistic addConstraintTime;
   
   extern Statistic queryIncremental;
-
+  extern Statistic queryIncCalculationTime;
 #ifdef DEBUG
   extern Statistic arrayHashTime;
 #endif
