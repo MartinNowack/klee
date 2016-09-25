@@ -28,6 +28,7 @@ Statistic stats::serializerTime("serializerTime", "Stime");
 Statistic stats::addConstraintTime("constraintsTime", "Contime");
 
 Statistic stats::queryIncremental("QueryIncremental", "Qinc");
+Statistic stats::queryIncCalculationTime("QIncTime", "QITime");
 
 #ifdef DEBUG
 Statistic stats::arrayHashTime("ArrayHashTime", "AHtime");
