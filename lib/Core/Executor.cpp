@@ -344,7 +344,7 @@ namespace {
   // XXX Move to CoreSolver
   cl::opt<bool> SolveIncremental("solve-incremental",
                                  cl::desc("Solve incremental (default=on)"),
-                                 cl::init(true));
+                                 cl::init(false));
 }
 
 
