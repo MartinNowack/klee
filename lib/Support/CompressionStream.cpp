@@ -47,7 +47,7 @@ compressed_fd_ostream::compressed_fd_ostream(const char *Filename,
   strm.next_out = buffer;
   strm.avail_out = BUFSIZE;
 
-  deflateInit2(&strm, Z_BEST_COMPRESSION, Z_DEFLATED, 15 | 16,
+  deflateInit2(&strm, Z_BEST_SPEED, Z_DEFLATED, 15 | 16,
                8 /* memory usage default, 0 smalles, 9 highest*/,
                Z_DEFAULT_STRATEGY);
 }
