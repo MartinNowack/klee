@@ -27,6 +27,8 @@ struct SolvingState {
   std::vector<std::pair<ConstraintPosition, std::vector<const Array *> > >
       usedConstraints;
 
+  std::vector<IndependentElementSet> used_expression;
+
   // Track level of insertion
   std::vector<uint64_t> insertLevel;
   std::vector<std::pair<const Array *, uint64_t> > used_arrays;
@@ -60,7 +62,7 @@ public:
       : max_solvers(5), active_solvers(0), activeSolver(nullptr) {
     // Add basic core solver
     SolvingState state(solver);
-    active_incremental_solvers.push_back(state);
+    active_incremental_solvers.push_back(std::move(state));
     std::unique_ptr<ClientProcessAdapterSolver> ptr(
         static_cast<ClientProcessAdapterSolver *>(solver));
     solvers.push_back(std::move(ptr));
@@ -78,7 +80,7 @@ public:
       s.solver->impl->setIncrementalStatus(true);
       s.solver_id = i;
       solvers.push_back(std::move(ptr));
-      active_incremental_solvers.push_back(s);
+      active_incremental_solvers.push_back(std::move(s));
     }
   }
 
@@ -118,6 +120,8 @@ public:
 
 protected:
   Query getPartialQuery(const Query &q);
+  Query getPartialQuery_simple_incremental(const Query &q);
+
   size_t selectBestSolver(const Query &q,
                           std::vector<std::vector<const Array *> > &objects,
                           size_t &non_conflict_level,
@@ -358,6 +362,106 @@ size_t IncrementalSolverImpl::selectBestSolver(
   return solver_index;
 }
 
+Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
+    const Query &q) {
+  SimpleConstraintManager cm(activeConstraints);
+  cm.clear();
+
+  // We'll use the one solver available
+  activeSolver = &active_incremental_solvers[1];
+
+  // Generate big query iset
+  // XXX we do not add expression, to not restrict too much ??
+  IndependentElementSet query_iset;
+  std::set<ref<Expr> > constraints_to_add;
+  for (auto i = q.constraints.iset_begin(), e = q.constraints.iset_end();
+       i != e; ++i) {
+    query_iset.add(*i);
+    constraints_to_add.insert((*i).exprs.begin(), (*i).exprs.end());
+  }
+
+  size_t reused = constraints_to_add.size();
+
+  // Simple, we just check how many constraints we have in common and remove
+  // the uncommon ones
+  // Each indep set contains one stack frame of constraints
+  size_t maxStackDepth = 0;
+  for (auto &iset : activeSolver->used_expression) {
+    if (!iset.intersects(query_iset)) {
+      // if it doesn't intersect, we can use that frame
+      ++maxStackDepth;
+      continue;
+    }
+    // if we have the same expression, we can use it
+    // otherwise, we have to abort
+    bool abort = false;
+
+    std::vector<ref<Expr> > temp_found_expressions;
+    for (auto expr : iset.exprs) {
+      // Check if we find that query in our constraints
+      auto it =
+          std::find(constraints_to_add.begin(), constraints_to_add.end(), expr);
+      if (it != constraints_to_add.end()) {
+        temp_found_expressions.push_back(expr);
+        continue; // yes, check the next
+      }
+
+      // no, so we have to abort
+      abort = true;
+      break;
+    }
+
+    if (abort)
+      break;
+
+    // delete the found expressions
+    for (auto &ex : temp_found_expressions)
+      constraints_to_add.erase(ex);
+
+    ++maxStackDepth;
+  }
+
+  // Will use this solver
+  // Update statistics and save constraints
+  q.query_size = activeSolver->usedConstraints.size();
+  q.added_constraints = constraints_to_add.size();
+  q.solver_id = activeSolver->solver_id;
+
+  // Clean up previous levels
+  activeSolver->used_expression.erase(activeSolver->used_expression.begin() +
+                                          maxStackDepth,
+                                      activeSolver->used_expression.end());
+
+  //  llvm::errs() << "Level: " << maxStackDepth <<
+  //      " I:" << !constraints_to_add.empty() << "\n";
+
+  if (!constraints_to_add.empty()) {
+    IndependentElementSet iset;
+    for (auto &e : constraints_to_add) {
+      iset.add(IndependentElementSet(e));
+      cm.push_back(e);
+    }
+    activeSolver->used_expression.push_back(std::move(iset));
+  }
+
+  activeSolver->solver->impl->popStack(maxStackDepth);
+
+  // We found one existing solver, update stats
+  if (maxStackDepth) {
+    ++stats::queryIncremental;
+    q.incremental_flag = true;
+    q.reused_cntr += (reused - constraints_to_add.size());
+  }
+  auto newQ = Query(activeConstraints, q.expr, q.queryOrigin);
+
+  //  llvm::errs() << "Old query\n";
+  //  q.dump();
+  //
+  //  llvm::errs() << "New query\n";
+  //  newQ.dump();
+
+  return newQ;
+}
 Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
 
   TimerStatIncrementer t(stats::queryIncCalculationTime);
@@ -367,6 +471,8 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
     activeSolver = &active_incremental_solvers[0];
     return q;
   }
+
+  return getPartialQuery_simple_incremental(q);
 
   SimpleConstraintManager cm(activeConstraints);
   std::vector<std::pair<ConstraintPosition, std::vector<const Array *> > >
