@@ -39,7 +39,7 @@ public:
              // be invoked.
 
   IndependentElementSet(){};
-  IndependentElementSet(ref<Expr> e);
+  explicit IndependentElementSet(ref<Expr> e);
   IndependentElementSet &operator=(const IndependentElementSet &ies) = delete;
   IndependentElementSet(IndependentElementSet &&set) = default;
   IndependentElementSet &operator=(IndependentElementSet &&set) = default;
