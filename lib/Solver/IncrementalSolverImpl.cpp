@@ -421,16 +421,26 @@ Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
     ++maxStackDepth;
   }
 
-  // Will use this solver
-  // Update statistics and save constraints
-  q.query_size = activeSolver->usedConstraints.size();
-  q.added_constraints = constraints_to_add.size();
-  q.solver_id = activeSolver->solver_id;
+  ////   Throw away old queries
+  //  if(reused - constraints_to_add.size() == 0) {
+  //    // If we cannot reuse any constraints,
+  //    // don't bother to use existing one
+  //    maxStackDepth = 0;
+  //  }
 
   // Clean up previous levels
   activeSolver->used_expression.erase(activeSolver->used_expression.begin() +
                                           maxStackDepth,
                                       activeSolver->used_expression.end());
+
+  // Will use this solver
+  // Update statistics and save constraints
+  size_t new_size = 0;
+  for (auto &i : activeSolver->used_expression)
+    new_size += i.exprs.size();
+  q.query_size = new_size;
+  q.added_constraints = constraints_to_add.size();
+  q.solver_id = activeSolver->solver_id;
 
   //  llvm::errs() << "Level: " << maxStackDepth <<
   //      " I:" << !constraints_to_add.empty() << "\n";
