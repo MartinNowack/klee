@@ -28,6 +28,7 @@ struct SolvingState {
       usedConstraints;
 
   std::vector<IndependentElementSet> used_expression;
+  std::vector<std::vector<ConstraintPosition> > used_positions;
 
   // Track level of insertion
   std::vector<uint64_t> insertLevel;
@@ -135,6 +136,18 @@ bool isSmaller(const ConstraintPosition &pos1, const ConstraintPosition &pos2) {
       pos1.constraint_width < pos2.constraint_width)
     return true;
   return false;
+}
+
+// if pos1 contains pos2
+bool contains(const ConstraintPosition &pos1, const ConstraintPosition &pos2) {
+  // if later id, it cannot contain
+  if (pos2.constraint_id > pos1.constraint_id)
+    return false;
+  if (pos2.constraint_id <= pos1.constraint_id - pos1.constraint_width)
+    return false;
+  if (pos1.constraint_id == pos2.constraint_id && pos1.version != pos2.version)
+    return false;
+  return true;
 }
 
 class ExprCountVisitor : public ExprVisitor {
@@ -373,11 +386,20 @@ Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
   // Generate big query iset
   // XXX we do not add expression, to not restrict too much ??
   IndependentElementSet query_iset;
-  std::set<ref<Expr> > constraints_to_add;
+  std::vector<ref<Expr> > constraints_to_add;
+  std::vector<ConstraintPosition> constraint_position;
+
+  std::set<size_t> positions;
+
+  size_t iset_cntr = 0;
   for (auto i = q.constraints.iset_begin(), e = q.constraints.iset_end();
-       i != e; ++i) {
+       i != e; ++i, ++iset_cntr) {
     query_iset.add(*i);
-    constraints_to_add.insert((*i).exprs.begin(), (*i).exprs.end());
+    constraints_to_add.insert(constraints_to_add.end(), (*i).exprs.begin(),
+                              (*i).exprs.end());
+    constraint_position.insert(constraint_position.end(),
+                               q.constraints.origPosition[iset_cntr].begin(),
+                               q.constraints.origPosition[iset_cntr].end());
   }
 
   size_t reused = constraints_to_add.size();
@@ -396,13 +418,36 @@ Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
     // otherwise, we have to abort
     bool abort = false;
 
-    std::vector<ref<Expr> > temp_found_expressions;
+    std::vector<size_t> temp_found_expressions;
+
+    auto expr_cntr = 0;
     for (auto expr : iset.exprs) {
+      // check if position is part of the query
+      auto &solver_expr_position =
+          activeSolver->used_positions[maxStackDepth][expr_cntr];
+
+      bool found = false;
+      for (auto pos_it = constraint_position.begin(),
+                pos_itE = constraint_position.end();
+           pos_it != pos_itE; ++pos_it) {
+        if (contains(solver_expr_position, *pos_it)) {
+          found = true;
+          temp_found_expressions.push_back(pos_it -
+                                           constraint_position.begin());
+          break;
+        }
+        if (found)
+          break;
+      }
+      expr_cntr++;
+      if (found)
+        continue;
+
       // Check if we find that query in our constraints
       auto it =
           std::find(constraints_to_add.begin(), constraints_to_add.end(), expr);
       if (it != constraints_to_add.end()) {
-        temp_found_expressions.push_back(expr);
+        temp_found_expressions.push_back(it - constraints_to_add.begin());
         continue; // yes, check the next
       }
 
@@ -415,18 +460,22 @@ Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
       break;
 
     // delete the found expressions
-    for (auto &ex : temp_found_expressions)
-      constraints_to_add.erase(ex);
-
+    positions.insert(temp_found_expressions.begin(),
+                     temp_found_expressions.end());
     ++maxStackDepth;
   }
 
-  ////   Throw away old queries
-  //  if(reused - constraints_to_add.size() == 0) {
-  //    // If we cannot reuse any constraints,
-  //    // don't bother to use existing one
-  //    maxStackDepth = 0;
-  //  }
+  for (auto i = positions.rbegin(), e = positions.rend(); i != e; ++i) {
+    constraints_to_add.erase(constraints_to_add.begin() + *i);
+    constraint_position.erase(constraint_position.begin() + *i);
+  }
+
+  //   Throw away old queries
+  if (reused - constraints_to_add.size() == 0) {
+    // If we cannot reuse any constraints,
+    // don't bother to use existing one
+    maxStackDepth = 0;
+  }
 
   // Clean up previous levels
   activeSolver->used_expression.erase(activeSolver->used_expression.begin() +
@@ -452,6 +501,7 @@ Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
       cm.push_back(e);
     }
     activeSolver->used_expression.push_back(std::move(iset));
+    activeSolver->used_positions.push_back(constraint_position);
   }
 
   activeSolver->solver->impl->popStack(maxStackDepth);
