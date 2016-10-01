@@ -143,6 +143,7 @@ private:
   static uint64_t next_free_position;
   static uint64_t version_cntr;
 
+public:
   // Tracks origin position for each constraint for each independence set
   std::vector<std::vector<ConstraintPosition> > origPosition;
 
