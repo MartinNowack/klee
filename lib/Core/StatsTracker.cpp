@@ -434,11 +434,9 @@ void StatsTracker::writeStatsHeader() {
 #ifdef DEBUG
              << "'ArrayHashTime',"
 #endif
-	     << "'CacheHits',"
-	     << "'CacheMisses',"
-	     << "'IndepConstraintsTime',"
-	     << "'SerializerTime',"
-	     << "'AddConstraintTime',"
+             << "'CacheHits',"
+             << "'CacheMisses',"
+             << "'QueryOriginCacheHits' ,"
              << ")\n";
   statsFile->flush();
 }
@@ -471,11 +469,9 @@ void StatsTracker::writeStatsLine() {
 #ifdef DEBUG
              << "," << stats::arrayHashTime / 1000000.
 #endif
-	     << "," << stats::queryCacheHits
-	     << "," << stats::queryCacheMisses
-	     << "," << stats::indepConstraintsTime
-	     << "," << stats::serializerTime
-	     << "," << stats::addConstraintTime
+             << "," << stats::queryCacheHits
+             << "," << stats::queryCacheMisses
+             << "," << stats::queryOriginCacheHits
              << ")\n";
   statsFile->flush();
 }
