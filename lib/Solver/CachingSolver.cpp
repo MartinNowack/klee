@@ -16,6 +16,9 @@
 #include "klee/SolverImpl.h"
 
 #include "klee/SolverStats.h"
+#include "klee/ExecutionState.h"
+#include "klee/Internal/Module/KInstruction.h"
+#include "klee/Internal/Module/InstructionInfoTable.h"
 
 #include <ciso646>
 #ifdef _LIBCPP_VERSION
@@ -69,9 +72,12 @@ private:
   typedef unordered_map<CacheEntry, 
                         IncompleteSolver::PartialValidity, 
                         CacheEntryHash> cache_map;
-  
+  typedef std::pair<const CacheEntry, IncompleteSolver::PartialValidity> CacheItem;
+
   Solver *solver;
   cache_map cache;
+
+  llvm::DenseMap<unsigned, cache_map::iterator> quickCache;
 
 public:
   CachingSolver(Solver *s) : solver(s) {}
@@ -127,8 +133,17 @@ bool CachingSolver::cacheLookup(const Query& query,
                                 IncompleteSolver::PartialValidity &result) {
   bool negationUsed;
   ref<Expr> canonicalQuery = canonicalizeQuery(query.expr, negationUsed);
-
   CacheEntry ce(query.constraints, canonicalQuery);
+
+  auto qit = quickCache.find(query.queryOrigin->prevPC->info->id);
+  if (qit != quickCache.end() and qit->second->first == ce){
+      ++stats::queryOriginCacheHits;
+      result = (negationUsed ?
+                IncompleteSolver::negatePartialValidity(qit->second->second) :
+                qit->second->second);
+      return true;
+  }
+
   cache_map::iterator it = cache.find(ce);
   
   if (it != cache.end()) {
@@ -150,8 +165,9 @@ void CachingSolver::cacheInsert(const Query& query,
   CacheEntry ce(query.constraints, canonicalQuery);
   IncompleteSolver::PartialValidity cachedResult = 
     (negationUsed ? IncompleteSolver::negatePartialValidity(result) : result);
-  
-  cache.insert(std::make_pair(ce, cachedResult));
+
+  auto itpair = cache.insert(std::make_pair(ce, cachedResult));
+  quickCache.insert(std::make_pair(query.queryOrigin->prevPC->info->id, itpair.first));
 }
 
 bool CachingSolver::computeValidity(const Query& query,

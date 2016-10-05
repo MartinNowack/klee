@@ -37,6 +37,8 @@ namespace stats {
   extern Statistic arrayHashTime;
 #endif
 
+  extern Statistic queryOriginCacheHits;
+
 }
 }
 
