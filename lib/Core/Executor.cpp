@@ -2723,11 +2723,16 @@ void Executor::checkMemoryUsage() {
   if (!MaxMemory)
     return;
   if ((stats::instructions & 0xFFFF) == 0) {
+    // We first check the allocated free space for the allocated
+    // deterministic memory, if none is used we will query the
+    // allocator for the used one
+    unsigned mbs = memory->getUsedDeterministicSize() >> 20;
+
     // We need to avoid calling GetTotalMallocUsage() often because it
     // is O(elts on freelist). This is really bad since we start
     // to pummel the freelist once we hit the memory cap.
-    unsigned mbs = (util::GetTotalMallocUsage() >> 20) +
-                   (memory->getUsedDeterministicSize() >> 20);
+    if (!mbs)
+      mbs = util::GetTotalMallocUsage() >> 20;
 
     if (mbs > MaxMemory) {
       if (mbs > MaxMemory + 100) {
