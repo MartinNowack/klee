@@ -16,11 +16,14 @@
 #include "llvm/Support/raw_ostream.h"
 
 namespace klee {
+
+class Executor;
 Solver *constructSolverChain(Solver *coreSolver,
                              std::string querySMT2LogPath,
                              std::string baseSolverQuerySMT2LogPath,
                              std::string queryKQueryLogPath,
-                             std::string baseSolverQueryKQueryLogPath) {
+                             std::string baseSolverQueryKQueryLogPath,
+                             const Executor* executor) {
   Solver *solver = coreSolver;
 
   if (optionIsSet(queryLoggingOptions, SOLVER_KQUERY)) {
@@ -44,7 +47,7 @@ Solver *constructSolverChain(Solver *coreSolver,
     solver = createCexCachingSolver(solver);
 
   if (UseCache)
-    solver = createCachingSolver(solver);
+    solver = createCachingSolver(solver, executor);
 
   if (UseIndependentSolver)
     solver = createIndependentSolver(solver);

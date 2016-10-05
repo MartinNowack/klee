@@ -434,12 +434,11 @@ void StatsTracker::writeStatsHeader() {
 #ifdef DEBUG
              << "'ArrayHashTime',"
 #endif
-	     << "'CacheHits',"
-	     << "'CacheMisses',"
-	     << "'ExprCntr',"
-	     << "'IndepConstraintsTime',"
-	     << "'SerializerTime',"
-	     << "'AddConstraintTime',"
+             << "'CacheHits',"
+             << "'CacheMisses',"
+             << "'QueryOriginCacheHits',"
+             << "'QueryOriginTime',"
+             << "'QueryOriginCacheReplace'"
              << ")\n";
   statsFile->flush();
 }
@@ -472,12 +471,11 @@ void StatsTracker::writeStatsLine() {
 #ifdef DEBUG
              << "," << stats::arrayHashTime / 1000000.
 #endif
-	     << "," << stats::queryCacheHits
-	     << "," << stats::queryCacheMisses
-	     << "," << Expr::count
-	     << "," << stats::indepConstraintsTime
-	     << "," << stats::serializerTime
-	     << "," << stats::addConstraintTime
+             << "," << stats::queryCacheHits
+             << "," << stats::queryCacheMisses
+             << "," << stats::queryOriginCacheHits
+             << "," << stats::queryOriginTime / 1000000.
+             << "," << stats::queryOriginCacheReplace
              << ")\n";
   statsFile->flush();
 }
@@ -549,33 +547,27 @@ void StatsTracker::writeIStats() {
   if (istatsMask & (1<<stats::states.getID()))
     updateStateStatistics(1);
 
-  std::string InsideFunctionSourceFile = "";
-  std::string FunctionSourceFile = "";
+  std::string sourceFile = "";
 
   CallSiteSummaryTable callSiteStats;
   if (UseCallPaths)
     callPathManager.getSummaryStatistics(callSiteStats);
 
-  // FIXME: Should be the called application and arguments
   of << "ob=" << objectFilename << "\n";
-
 
   for (Module::iterator fnIt = m->begin(), fn_ie = m->end(); 
        fnIt != fn_ie; ++fnIt) {
     if (!fnIt->isDeclaration()) {
-      // update the source file from the function if needed
-      const InstructionInfo &fii =
-        executor.kmodule->infos->getFunctionInfo(fnIt);
-
-      if (fii.file != "" && fii.file!=FunctionSourceFile) {
-        of << "fl=" << fii.file << "\n";
-        FunctionSourceFile = fii.file;
+      // Always try to write the filename before the function name, as otherwise
+      // KCachegrind can create two entries for the function, one with an
+      // unnamed file and one without.
+      const InstructionInfo &ii = executor.kmodule->infos->getFunctionInfo(fnIt);
+      if (ii.file != sourceFile) {
+        of << "fl=" << ii.file << "\n";
+        sourceFile = ii.file;
       }
-      InsideFunctionSourceFile = FunctionSourceFile;
-
-
-      // start a new function
-      of << "fn=" << fnIt->getName() << "\n";
+      
+      of << "fn=" << fnIt->getName().str() << "\n";
       for (Function::iterator bbIt = fnIt->begin(), bb_ie = fnIt->end(); 
            bbIt != bb_ie; ++bbIt) {
         for (BasicBlock::iterator it = bbIt->begin(), ie = bbIt->end(); 
@@ -583,10 +575,9 @@ void StatsTracker::writeIStats() {
           Instruction *instr = &*it;
           const InstructionInfo &ii = executor.kmodule->infos->getInfo(instr);
           unsigned index = ii.id;
-          if (ii.file !="" && ii.file!=InsideFunctionSourceFile) {
-            // instruction is from other file, i.e. due to inlining: fi=/fe=
-            of << "fi=" << ii.file << "\n";
-            InsideFunctionSourceFile = ii.file;
+          if (ii.file!=sourceFile) {
+            of << "fl=" << ii.file << "\n";
+            sourceFile = ii.file;
           }
           of << ii.assemblyLine << " ";
           of << ii.line << " ";
@@ -607,9 +598,9 @@ void StatsTracker::writeIStats() {
                 const InstructionInfo &fii = 
                   executor.kmodule->infos->getFunctionInfo(f);
   
-                if (fii.file!="" && fii.file!=InsideFunctionSourceFile)
-                  of << "cfi=" << fii.file << "\n";
-                of << "cfn=" << f->getName() << "\n";
+                if (fii.file!="" && fii.file!=sourceFile)
+                  of << "cfl=" << fii.file << "\n";
+                of << "cfn=" << f->getName().str() << "\n";
                 of << "calls=" << csi.count << " ";
                 of << fii.assemblyLine << " ";
                 of << fii.line << "\n";
@@ -638,7 +629,6 @@ void StatsTracker::writeIStats() {
           }
         }
       }
-      of << "\n";
     }
   }
 
