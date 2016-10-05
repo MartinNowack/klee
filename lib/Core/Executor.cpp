@@ -127,15 +127,15 @@ namespace {
 
   /// The different query logging solvers that can switched on/off
   enum PrintDebugInstructionsType {
-    STDERR_ALL, ///
-    STDERR_SRC,
-    STDERR_COMPACT,
-    FILE_ALL,    ///
-    FILE_SRC,    ///
-    FILE_COMPACT ///
+    STDERR_ALL = 0x0 + 0x2,     ///
+    STDERR_SRC = 0x0 + 0x4,     ///
+    STDERR_COMPACT = 0x0 + 0x8, ///
+    FILE_ALL = 0x1 + 0x2,       ///
+    FILE_SRC = 0x1 + 0x4,       ///
+    FILE_COMPACT = 0x1 + 0x8    ///
   };
 
-  llvm::cl::list<PrintDebugInstructionsType> DebugPrintInstructions(
+  llvm::cl::opt<PrintDebugInstructionsType> DebugPrintInstructions(
       "debug-print-instructions",
       llvm::cl::desc("Log instructions during execution."),
       llvm::cl::values(
@@ -376,9 +376,8 @@ Executor::Executor(const InterpreterOptions &opts, InterpreterHandler *ih)
   this->solver = new TimingSolver(solver, EqualitySubstitution);
   memory = new MemoryManager(&arrayCache);
 
-  if (optionIsSet(DebugPrintInstructions, FILE_ALL) ||
-      optionIsSet(DebugPrintInstructions, FILE_COMPACT) ||
-      optionIsSet(DebugPrintInstructions, FILE_SRC)) {
+  if (DebugPrintInstructions &&
+      (DebugPrintInstructions & 0x1) == 1) { // Check if write to a file
     std::string debug_file_name =
         interpreterHandler->getOutputFilename("instructions.txt");
     std::string ErrorInfo;
@@ -1249,26 +1248,23 @@ void Executor::executeGetValue(ExecutionState &state,
 
 void Executor::printDebugInstructions(ExecutionState &state) {
   // check do not print
-  if (DebugPrintInstructions.size() == 0)
-	  return;
+  if (!DebugPrintInstructions)
+    return;
 
   llvm::raw_ostream *stream = 0;
-  if (optionIsSet(DebugPrintInstructions, STDERR_ALL) ||
-      optionIsSet(DebugPrintInstructions, STDERR_SRC) ||
-      optionIsSet(DebugPrintInstructions, STDERR_COMPACT))
+  if (!(DebugPrintInstructions & 0x1)) // print to stderr
     stream = &llvm::errs();
   else
     stream = &debugLogBuffer;
 
-  if (!optionIsSet(DebugPrintInstructions, STDERR_COMPACT) &&
-      !optionIsSet(DebugPrintInstructions, FILE_COMPACT))
+  // Write source code position (if not in compact)
+  if (!(DebugPrintInstructions & 0x8))
     printFileLine(state, state.pc, *stream);
 
   (*stream) << state.pc->info->id;
   (*stream) << ":" << state.uid;
 
-  if (optionIsSet(DebugPrintInstructions, STDERR_ALL) ||
-      optionIsSet(DebugPrintInstructions, FILE_ALL))
+  if (DebugPrintInstructions & 0x2) { // Print LLVM IR instruction
     if (state.pc->inst_description.length() == 0) {
       llvm::raw_string_ostream s(state.pc->inst_description);
       state.pc->inst->print(s);
@@ -1281,11 +1277,10 @@ void Executor::printDebugInstructions(ExecutionState &state) {
           state.pc->inst_description.end());
     }
     (*stream) << ":" << state.pc->inst_description;
+  }
   (*stream) << "\n";
 
-  if (optionIsSet(DebugPrintInstructions, FILE_ALL) ||
-      optionIsSet(DebugPrintInstructions, FILE_COMPACT) ||
-      optionIsSet(DebugPrintInstructions, FILE_SRC)) {
+  if (DebugPrintInstructions & 0x1) { // File
     debugLogBuffer.flush();
     (*debugInstFile) << debugLogBuffer.str();
     debugBufferString = "";
