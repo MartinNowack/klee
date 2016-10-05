@@ -327,10 +327,22 @@ bool STPSolverImpl::computeInitialValues(
 
   TimerStatIncrementer t(stats::queryTime);
 
-  vc_push(vc);
+  // sort the constraints, as the order influences results of the solver
+  std::vector<ref<Expr> > sorted_constraints;
+  sorted_constraints.reserve(query.constraints.size());
 
   for (ConstraintManager::const_iterator it = query.constraints.begin(),
                                          ie = query.constraints.end();
+       it != ie; ++it) {
+    sorted_constraints.insert(std::upper_bound(sorted_constraints.begin(),
+                                               sorted_constraints.end(), *it),
+                              *it);
+  }
+
+  vc_push(vc);
+
+  for (ConstraintManager::const_iterator it = sorted_constraints.begin(),
+                                         ie = sorted_constraints.end();
        it != ie; ++it)
     vc_assertFormula(vc, builder->construct(*it));
 
