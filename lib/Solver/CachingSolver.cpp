@@ -19,6 +19,7 @@
 #include "klee/ExecutionState.h"
 #include "klee/Internal/Module/KInstruction.h"
 #include "klee/Internal/Module/InstructionInfoTable.h"
+#include "klee/TimerStatIncrementer.h"
 
 #include <ciso646>
 
@@ -151,19 +152,22 @@ bool CachingSolver::cacheLookup(const Query& query,
   ref<Expr> canonicalQuery = canonicalizeQuery(query.expr, negationUsed);
   const CacheEntry ce(query.constraints, canonicalQuery);
 
-  //lookup query origin cache
-  const unsigned codeposition = query.queryOrigin->prevPC->info->id;
-  auto qit = std::lower_bound(queryOriginCache.begin(), queryOriginCache.end(), codeposition, qOCacheItemCompare_Lower);
-  //search all cache entries for this code position
-  while (qit != queryOriginCache.end() and qit->first == codeposition){
-      if (qit->second->first != ce){
-          ++stats::queryOriginCacheHits;
-          result = (negationUsed ?
-                    IncompleteSolver::negatePartialValidity(qit->second->second) :
-                    qit->second->second);
-          return true;
+  {
+      TimerStatIncrementer t(stats::queryOriginTime);
+      //lookup query origin cache
+      const unsigned codeposition = query.queryOrigin->prevPC->info->id;
+      auto qit = std::lower_bound(queryOriginCache.begin(), queryOriginCache.end(), codeposition, qOCacheItemCompare_Lower);
+      //search all cache entries for this code position
+      while (qit != queryOriginCache.end() and qit->first == codeposition){
+          if (qit->second->first != ce){
+              ++stats::queryOriginCacheHits;
+              result = (negationUsed ?
+                        IncompleteSolver::negatePartialValidity(qit->second->second) :
+                        qit->second->second);
+              return true;
+          }
+          qit++;
       }
-      qit++;
   }
 
   cache_map::iterator it = cache.find(ce);
