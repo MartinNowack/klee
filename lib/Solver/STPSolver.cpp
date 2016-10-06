@@ -387,8 +387,7 @@ bool STPSolverImpl::computePartialInitialValues(
   std::vector<ref<Expr> > sorted_constraints;
   sorted_constraints.reserve(query.constraints.size());
 
-  for (ConstraintManager::const_iterator it = query.constraints.begin(),
-                                         ie = query.constraints.end();
+  for (auto it = query.constraints.begin(), ie = query.constraints.end();
        it != ie; ++it) {
     sorted_constraints.insert(std::upper_bound(sorted_constraints.begin(),
                                                sorted_constraints.end(), *it),
@@ -400,8 +399,7 @@ bool STPSolverImpl::computePartialInitialValues(
     vc_push(vc);
     ++stackIndex;
 
-    for (ConstraintSetView::const_iterator it = sorted_constraints.begin(),
-                                           ie = sorted_constraints.end();
+    for (auto it = sorted_constraints.begin(), ie = sorted_constraints.end();
          it != ie; ++it) {
       vc_assertFormula(vc, builder->construct(*it));
     }
@@ -411,8 +409,7 @@ bool STPSolverImpl::computePartialInitialValues(
 
   vc_push(vc);
   if (!incremental) {
-    for (ConstraintSetView::const_iterator it = sorted_constraints.begin(),
-                                           ie = sorted_constraints.end();
+    for (auto it = sorted_constraints.begin(), ie = sorted_constraints.end();
          it != ie; ++it) {
       vc_assertFormula(vc, builder->construct(*it));
     }
