@@ -38,6 +38,7 @@ namespace stats {
 #endif
 
   extern Statistic queryOriginCacheHits;
+  extern Statistic queryOriginTime;
 
 }
 }

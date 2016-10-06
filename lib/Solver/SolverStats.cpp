@@ -34,5 +34,5 @@ Statistic stats::queryIncCalculationTime("QIncTime", "QITime");
 Statistic stats::arrayHashTime("ArrayHashTime", "AHtime");
 #endif
 
-Statistic stats::queryOriginCacheHits("QueryOriginCacheHits", "QSChits") ;
-
+Statistic stats::queryOriginCacheHits("QueryOriginCacheHits", "QOCHits") ;
+Statistic stats::queryOriginTime("QueryOriginCacheTime", "QOCTime") ;
