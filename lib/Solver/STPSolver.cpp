@@ -397,8 +397,6 @@ bool STPSolverImpl::computePartialInitialValues(
 
   TimerStatIncrementer t(stats::queryTime);
 
-  vc_push(vc);
-
   bool emptyConstraints = query.constraints.empty();
   if (incremental && !emptyConstraints) {
     vc_push(vc);
