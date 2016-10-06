@@ -21,6 +21,7 @@
 #include "klee/Internal/Module/InstructionInfoTable.h"
 
 #include <ciso646>
+
 #ifdef _LIBCPP_VERSION
 #include <unordered_map>
 #define unordered_map std::unordered_map
@@ -56,6 +57,11 @@ private:
     bool operator==(const CacheEntry &b) const {
       return constraints==b.constraints && *query.get()==*b.query.get();
     }
+
+    bool operator!=(const CacheEntry &b) const {
+          return !(*this == b);
+    }
+
   };
   
   struct CacheEntryHash {
@@ -77,7 +83,17 @@ private:
   Solver *solver;
   cache_map cache;
 
-  llvm::DenseMap<unsigned, cache_map::iterator> quickCache;
+  typedef std::pair<unsigned, cache_map::iterator> QOCacheItem;
+
+  static inline bool qOCacheItemCompare_Lower(const QOCacheItem& it, const unsigned& val){
+      return it.first < val;
+  }
+
+  static inline bool qOCacheItemCompare_Upper(const unsigned& val, const QOCacheItem& it){
+      return val < it.first;
+  }
+
+  std::vector<QOCacheItem> queryOriginCache;
 
 public:
   CachingSolver(Solver *s) : solver(s) {}
@@ -133,15 +149,21 @@ bool CachingSolver::cacheLookup(const Query& query,
                                 IncompleteSolver::PartialValidity &result) {
   bool negationUsed;
   ref<Expr> canonicalQuery = canonicalizeQuery(query.expr, negationUsed);
-  CacheEntry ce(query.constraints, canonicalQuery);
+  const CacheEntry ce(query.constraints, canonicalQuery);
 
-  auto qit = quickCache.find(query.queryOrigin->prevPC->info->id);
-  if (qit != quickCache.end() and qit->second->first == ce){
-      ++stats::queryOriginCacheHits;
-      result = (negationUsed ?
-                IncompleteSolver::negatePartialValidity(qit->second->second) :
-                qit->second->second);
-      return true;
+  //lookup query origin cache
+  const unsigned codeposition = query.queryOrigin->prevPC->info->id;
+  auto qit = std::lower_bound(queryOriginCache.begin(), queryOriginCache.end(), codeposition, qOCacheItemCompare_Lower);
+  //search all cache entries for this code position
+  while (qit != queryOriginCache.end() and qit->first == codeposition){
+      if (qit->second->first != ce){
+          ++stats::queryOriginCacheHits;
+          result = (negationUsed ?
+                    IncompleteSolver::negatePartialValidity(qit->second->second) :
+                    qit->second->second);
+          return true;
+      }
+      qit++;
   }
 
   cache_map::iterator it = cache.find(ce);
@@ -167,7 +189,10 @@ void CachingSolver::cacheInsert(const Query& query,
     (negationUsed ? IncompleteSolver::negatePartialValidity(result) : result);
 
   auto itpair = cache.insert(std::make_pair(ce, cachedResult));
-  quickCache.insert(std::make_pair(query.queryOrigin->prevPC->info->id, itpair.first));
+
+  const unsigned codeposition = query.queryOrigin->prevPC->info->id;
+  auto qit = std::upper_bound(queryOriginCache.begin(), queryOriginCache.end(), codeposition, qOCacheItemCompare_Upper);
+  queryOriginCache.insert(qit, std::make_pair(codeposition, itpair.first));
 }
 
 bool CachingSolver::computeValidity(const Query& query,
