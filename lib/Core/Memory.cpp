@@ -213,35 +213,63 @@ const UpdateList &ObjectState::getUpdates() const {
     }
 
     std::vector< ref<ConstantExpr> > Contents(size);
-
     // Initialize to zeros.
     for (unsigned i = 0, e = size; i != e; ++i)
       Contents[i] = ConstantExpr::create(0, Expr::Int8);
 
     // Pull off as many concrete writes as we can.
     unsigned Begin = 0, End = Writes.size();
+
+    std::map<unsigned, unsigned> update_writes;
+    // Push concrete writes into the constant array.
     for (; Begin != End; ++Begin) {
-      // Push concrete writes into the constant array.
+      // Check if accessed index is symbolic.
+      // In that case, we could potentially access every element
+      // abort, and use the remaining updates
       ConstantExpr *Index = dyn_cast<ConstantExpr>(Writes[Begin].first);
       if (!Index)
         break;
 
+      // Check if we write a non-constant value
       ConstantExpr *Value = dyn_cast<ConstantExpr>(Writes[Begin].second);
-      if (!Value)
-        break;
+      if (!Value) {
+        // Add it to the update list
+        uint64_t index_val = Index->getZExtValue();
+        if (!update_writes.insert(std::make_pair(index_val, Begin))
+                 .second)
+          update_writes[index_val] = Begin;
+        continue;
+      }
+
+      // Check if index has already been written symbolically
+      // overwrite with the concrete values
+      std::map<unsigned, unsigned>::iterator found =
+          update_writes.find(Index->getZExtValue());
+      if (found != update_writes.end())
+        update_writes.erase(found);
 
       Contents[Index->getZExtValue()] = Value;
     }
+
+    // prepare new update list
+    updates = UpdateList(0, 0);
+
+    // Write the symbolic updates with concrete index
+    for (std::map<unsigned, unsigned>::iterator it = update_writes.begin(),
+                                                itE = update_writes.end();
+         it != itE; ++it)
+      updates.extend(Writes[it->second].first, Writes[it->second].second);
+
+    // Apply the remaining (non-constant) writes.
+    for (; Begin != End; ++Begin)
+      updates.extend(Writes[Begin].first, Writes[Begin].second);
 
     static unsigned id = 0;
     const Array *array = getArrayCache()->CreateArray(
         "const_arr" + llvm::utostr(++id), size, &Contents[0],
         &Contents[0] + Contents.size());
-    updates = UpdateList(array, 0);
 
-    // Apply the remaining (non-constant) writes.
-    for (; Begin != End; ++Begin)
-      updates.extend(Writes[Begin].first, Writes[Begin].second);
+    updates.root = array;
 
     unsigned newSize = updates.head ? updates.head->getSize() : 0;
     allocated_memory -= (NumWrites - newSize)*sizeof(UpdateNode);
