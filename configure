@@ -4999,7 +4999,7 @@ return tc_malloc ();
   return 0;
 }
 _ACEOF
-for ac_lib in '' tcmalloc_minimal; do
+for ac_lib in '' tcmalloc tcmalloc_minimal; do
   if test -z "$ac_lib"; then
     ac_res="none required"
   else
