@@ -2733,6 +2733,8 @@ void Executor::checkMemoryUsage() {
     // to pummel the freelist once we hit the memory cap.
     if (!mbs)
       mbs = util::GetTotalMallocUsage() >> 20;
+    else
+      mbs += ObjectState::allocated_memory >> 20;
 
     if (mbs > MaxMemory) {
       if (mbs > MaxMemory + 100) {

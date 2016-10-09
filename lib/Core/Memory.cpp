@@ -98,6 +98,8 @@ void MemoryObject::getAllocInfo(std::string &result) const {
 
 /***/
 
+uint64_t ObjectState::allocated_memory = 0;
+
 ObjectState::ObjectState(const MemoryObject *mo)
   : copyOnWriteOwner(0),
     refCount(0),
@@ -117,6 +119,8 @@ ObjectState::ObjectState(const MemoryObject *mo)
     updates = UpdateList(array, 0);
   }
   memset(concreteStore, 0, size);
+
+  allocated_memory += sizeof(ObjectState) + size*3 /*concrete store*/;
 }
 
 
@@ -134,6 +138,7 @@ ObjectState::ObjectState(const MemoryObject *mo, const Array *array)
   mo->refCount++;
   makeSymbolic();
   memset(concreteStore, 0, size);
+  allocated_memory += sizeof(ObjectState) + size*3 /*concrete store*/;
 }
 
 ObjectState::ObjectState(const ObjectState &os) 
@@ -155,15 +160,21 @@ ObjectState::ObjectState(const ObjectState &os)
     knownSymbolics = new ref<Expr>[size];
     for (unsigned i=0; i<size; i++)
       knownSymbolics[i] = os.knownSymbolics[i];
+    allocated_memory += sizeof(ref<Expr>)*size /*known symbolics*/;
   }
 
+  allocated_memory += sizeof(ObjectState) + size*3 /*concrete store*/;
   memcpy(concreteStore, os.concreteStore, size*sizeof(*concreteStore));
 }
 
 ObjectState::~ObjectState() {
   if (concreteMask) delete concreteMask;
   if (flushMask) delete flushMask;
-  if (knownSymbolics) delete[] knownSymbolics;
+  if (knownSymbolics){
+    delete[] knownSymbolics;
+    allocated_memory -= sizeof(ref<Expr>)*size /*known symbolics*/;
+
+  }
   delete[] concreteStore;
 
   if (object)
@@ -175,6 +186,7 @@ ObjectState::~ObjectState() {
       delete object;
     }
   }
+  allocated_memory -= sizeof(ObjectState) + size*3 /*concrete store*/;
 }
 
 ArrayCache *ObjectState::getArrayCache() const {
@@ -230,6 +242,9 @@ const UpdateList &ObjectState::getUpdates() const {
     // Apply the remaining (non-constant) writes.
     for (; Begin != End; ++Begin)
       updates.extend(Writes[Begin].first, Writes[Begin].second);
+
+    unsigned newSize = updates.head ? updates.head->getSize() : 0;
+    allocated_memory -= (NumWrites - newSize)*sizeof(UpdateNode);
   }
 
   return updates;
@@ -298,6 +313,7 @@ void ObjectState::flushRangeForRead(unsigned rangeBase,
         updates.extend(ConstantExpr::create(offset, Expr::Int32),
                        knownSymbolics[offset]);
       }
+      allocated_memory += sizeof(UpdateNode);
 
       flushMask->unset(offset);
     }
@@ -320,7 +336,7 @@ void ObjectState::flushRangeForWrite(unsigned rangeBase,
                        knownSymbolics[offset]);
         setKnownSymbolic(offset, 0);
       }
-
+      allocated_memory += sizeof(UpdateNode);
       flushMask->unset(offset);
     } else {
       // flushed bytes that are written over still need
@@ -378,6 +394,7 @@ void ObjectState::setKnownSymbolic(unsigned offset,
     if (value) {
       knownSymbolics = new ref<Expr>[size];
       knownSymbolics[offset] = value;
+      allocated_memory += sizeof(ref<Expr>)*size /*known symbolics*/;
     }
   }
 }
@@ -450,6 +467,8 @@ void ObjectState::write8(ref<Expr> offset, ref<Expr> value) {
   }
   
   updates.extend(ZExtExpr::create(offset, Expr::Int32), value);
+  allocated_memory += sizeof(UpdateNode);
+
 }
 
 /***/
