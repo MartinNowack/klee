@@ -173,6 +173,7 @@ public:
 
   bool readOnly;
 
+  static uint64_t allocated_memory;
 public:
   /// Create a new object state for the given memory object with concrete
   /// contents. The initial contents are undefined, it is the callers
