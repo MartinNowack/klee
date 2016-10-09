@@ -595,7 +595,7 @@ AS_IF([test "x$with_tcmalloc" != "xno"],
 
 AS_IF([test "x$have_tcmalloc" = "xyes"],
       [
-	AC_SEARCH_LIBS(tc_malloc,tcmalloc_minimal,
+	AC_SEARCH_LIBS(tc_malloc,tcmalloc tcmalloc_minimal,
 		     [
 		      AC_SUBST(HAVE_TCMALLOC, 1)
 		      if test "${ac_cv_search_tc_malloc}" != "none required"; then
