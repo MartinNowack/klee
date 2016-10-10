@@ -963,12 +963,12 @@ void stop_forking() {
 }
 
 static void interrupt_handle() {
+  // Attention: This is an interrupt handler function
+  // Only call async-signal-safe functions should be called
   if (!interrupted && theInterpreter) {
-    llvm::errs() << "KLEE: ctrl-c detected, requesting interpreter to halt.\n";
     halt_execution();
     sys::SetInterruptFunction(interrupt_handle);
   } else {
-    llvm::errs() << "KLEE: ctrl-c detected, exiting.\n";
     exit(1);
   }
   interrupted = true;
