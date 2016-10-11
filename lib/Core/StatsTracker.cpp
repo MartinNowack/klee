@@ -229,7 +229,7 @@ StatsTracker::StatsTracker(Executor &_executor, std::string _objectFilename,
     for (unsigned i=0; i<kf->numInstructions; ++i) {
       KInstruction *ki = kf->instructions[i];
 
-      if (OutputIStats) {
+      if (OutputIStats || updateMinDistToUncovered) {
         unsigned id = ki->info->id;
         theStatisticManager->setIndex(id);
         if (kf->trackCoverage && instructionIsCoverable(ki->inst))
@@ -288,7 +288,7 @@ void StatsTracker::done() {
 }
 
 void StatsTracker::stepInstruction(ExecutionState &es) {
-  if (OutputIStats) {
+  if (OutputIStats || updateMinDistToUncovered) {
     if (TrackInstructionTime) {
       static sys::TimeValue lastNowTime(0,0),lastUserTime(0,0);
     
@@ -311,8 +311,7 @@ void StatsTracker::stepInstruction(ExecutionState &es) {
     const InstructionInfo &ii = *es.pc->info;
     StackFrame &sf = es.stack.back();
     theStatisticManager->setIndex(ii.id);
-    if (UseCallPaths)
-      theStatisticManager->setContext(&sf.callPathNode->statistics);
+    theStatisticManager->setContext(&sf.callPathNode->statistics);
 
     if (es.instsSinceCovNew)
       ++es.instsSinceCovNew;
@@ -324,11 +323,11 @@ void StatsTracker::stepInstruction(ExecutionState &es) {
         //
         // FIXME: This trick no longer works, we should fix this in the line
         // number propogation.
-          es.coveredLines[&ii.file].insert(ii.line);
-	es.coveredNew = true;
+        es.coveredLines[&ii.file].insert(ii.line);
+        es.coveredNew = true;
         es.instsSinceCovNew = 1;
-	++stats::coveredInstructions;
-	stats::uncoveredInstructions += (uint64_t)-1;
+        ++stats::coveredInstructions;
+        stats::uncoveredInstructions += (uint64_t)-1;
       }
     }
   }
@@ -346,22 +345,17 @@ void StatsTracker::stepInstruction(ExecutionState &es) {
 
 /* Should be called _after_ the es->pushFrame() */
 void StatsTracker::framePushed(ExecutionState &es, StackFrame *parentFrame) {
-  if (OutputIStats) {
-    StackFrame &sf = es.stack.back();
+  StackFrame &sf = es.stack.back();
 
-    if (UseCallPaths) {
-      CallPathNode *parent = parentFrame ? parentFrame->callPathNode : 0;
-      CallPathNode *cp = callPathManager.getCallPath(parent, 
-                                                     sf.caller ? sf.caller->inst : 0, 
-                                                     sf.kf->function);
-      sf.callPathNode = cp;
-      cp->count++;
-    }
+  if (UseCallPaths || updateMinDistToUncovered) {
+    CallPathNode *parent = parentFrame ? parentFrame->callPathNode : 0;
+    CallPathNode *cp = callPathManager.getCallPath(
+        parent, sf.caller ? sf.caller->inst : 0, sf.kf->function);
+    sf.callPathNode = cp;
+    cp->count++;
   }
 
   if (updateMinDistToUncovered) {
-    StackFrame &sf = es.stack.back();
-
     uint64_t minDistAtRA = 0;
     if (parentFrame)
       minDistAtRA = parentFrame->minDistToUncoveredOnReturn;
@@ -379,7 +373,7 @@ void StatsTracker::framePopped(ExecutionState &es) {
 
 void StatsTracker::markBranchVisited(ExecutionState *visitedTrue, 
                                      ExecutionState *visitedFalse) {
-  if (OutputIStats) {
+  if (OutputIStats || updateMinDistToUncovered) {
     unsigned id = theStatisticManager->getIndex();
     uint64_t hasTrue = theStatisticManager->getIndexedValue(stats::trueBranches, id);
     uint64_t hasFalse = theStatisticManager->getIndexedValue(stats::falseBranches, id);
@@ -467,7 +461,7 @@ void StatsTracker::updateStateStatistics(uint64_t addend) {
     ExecutionState &state = **it;
     const InstructionInfo &ii = *state.pc->info;
     theStatisticManager->incrementIndexedValue(stats::states, ii.id, addend);
-    if (UseCallPaths)
+    if (UseCallPaths || updateMinDistToUncovered)
       state.stack.back().callPathNode->statistics.incrementValue(stats::states, addend);
   }
 }
