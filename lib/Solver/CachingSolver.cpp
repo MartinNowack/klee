@@ -161,7 +161,7 @@ bool CachingSolver::cacheLookup(const Query& query,
           auto qit = std::lower_bound(queryOriginCache.begin(), queryOriginCache.end(), codeposition, qOCacheItemCompare_Lower);
           //search all cache entries for this code position
           while (qit != queryOriginCache.end() and qit->first == codeposition){
-              if (qit->second->first != ce){
+              if (qit->second->first == ce){
                   ++stats::queryOriginCacheHits;
                   result = (negationUsed ?
                             IncompleteSolver::negatePartialValidity(qit->second->second) :
