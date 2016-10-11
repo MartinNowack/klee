@@ -157,9 +157,8 @@ ObjectState::ObjectState(const ObjectState &os)
     object->refCount++;
 
   if (os.knownSymbolics) {
-    knownSymbolics = new ref<Expr>[size];
-    for (unsigned i=0; i<size; i++)
-      knownSymbolics[i] = os.knownSymbolics[i];
+    knownSymbolics = new ExprArray;
+    knownSymbolics->insert(os.knownSymbolics->begin(), os.knownSymbolics->end());
     allocated_memory += sizeof(ref<Expr>)*size /*known symbolics*/;
   }
 
@@ -171,9 +170,9 @@ ObjectState::~ObjectState() {
   if (concreteMask) delete concreteMask;
   if (flushMask) delete flushMask;
   if (knownSymbolics){
-    delete[] knownSymbolics;
     allocated_memory -= sizeof(ref<Expr>)*size /*known symbolics*/;
 
+    delete knownSymbolics;
   }
   delete[] concreteStore;
 
@@ -339,7 +338,7 @@ void ObjectState::flushRangeForRead(unsigned rangeBase,
       } else {
         assert(isByteKnownSymbolic(offset) && "invalid bit set in flushMask");
         updates.extend(ConstantExpr::create(offset, Expr::Int32),
-                       knownSymbolics[offset]);
+                       (*knownSymbolics)[offset]);
       }
       allocated_memory += sizeof(UpdateNode);
 
@@ -361,7 +360,7 @@ void ObjectState::flushRangeForWrite(unsigned rangeBase,
       } else {
         assert(isByteKnownSymbolic(offset) && "invalid bit set in flushMask");
         updates.extend(ConstantExpr::create(offset, Expr::Int32),
-                       knownSymbolics[offset]);
+                       (*knownSymbolics)[offset]);
         setKnownSymbolic(offset, 0);
       }
       allocated_memory += sizeof(UpdateNode);
@@ -387,7 +386,7 @@ bool ObjectState::isByteFlushed(unsigned offset) const {
 }
 
 bool ObjectState::isByteKnownSymbolic(unsigned offset) const {
-  return knownSymbolics && knownSymbolics[offset].get();
+  return knownSymbolics && (*knownSymbolics)[offset].get();
 }
 
 void ObjectState::markByteConcrete(unsigned offset) {
@@ -416,15 +415,23 @@ void ObjectState::markByteFlushed(unsigned offset) {
 
 void ObjectState::setKnownSymbolic(unsigned offset, 
                                    Expr *value /* can be null */) {
-  if (knownSymbolics) {
-    knownSymbolics[offset] = value;
-  } else {
-    if (value) {
-      knownSymbolics = new ref<Expr>[size];
-      knownSymbolics[offset] = value;
+  // Check if we add the value (not null)
+  if (value) {
+    if (!knownSymbolics) {
+      knownSymbolics = new ExprArray();
       allocated_memory += sizeof(ref<Expr>)*size /*known symbolics*/;
     }
+    (*knownSymbolics)[offset] = value;
   }
+//  else {
+//    // we delete the previous value if exists
+//    if (knownSymbolics) {
+//      ExprArray::iterator found = knownSymbolics->find(offset);
+//      if (found != knownSymbolics->end()){
+//        knownSymbolics->erase(found);
+//      }
+//    }
+//  }
 }
 
 /***/
@@ -433,7 +440,7 @@ ref<Expr> ObjectState::read8(unsigned offset) const {
   if (isByteConcrete(offset)) {
     return ConstantExpr::create(concreteStore[offset], Expr::Int8);
   } else if (isByteKnownSymbolic(offset)) {
-    return knownSymbolics[offset];
+    return (*knownSymbolics)[offset];
   } else {
     assert(isByteFlushed(offset) && "unflushed byte without cache value");
     

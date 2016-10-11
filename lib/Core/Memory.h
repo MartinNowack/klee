@@ -18,6 +18,15 @@
 #include <vector>
 #include <string>
 
+#include <ciso646>
+#ifdef _LIBCPP_VERSION
+#include <unordered_map>
+#define unordered_map std::unordered_map
+#else
+#include <tr1/unordered_map>
+#define unordered_map std::tr1::unordered_map
+#endif
+
 namespace llvm {
   class Value;
 }
@@ -163,7 +172,9 @@ private:
   // mutable because may need flushed during read of const
   mutable BitArray *flushMask;
 
-  ref<Expr> *knownSymbolics;
+  // Reference to every symbolic byte of the the memory object
+  typedef unordered_map<size_t, ref<Expr>> ExprArray;
+  ExprArray * knownSymbolics;
 
   // mutable because we may need flush during read of const
   mutable UpdateList updates;
