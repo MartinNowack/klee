@@ -152,21 +152,24 @@ bool CachingSolver::cacheLookup(const Query& query,
   ref<Expr> canonicalQuery = canonicalizeQuery(query.expr, negationUsed);
   const CacheEntry ce(query.constraints, canonicalQuery);
 
-  {
+  { //QueryOriginCache
       TimerStatIncrementer t(stats::queryOriginTime);
-      //lookup query origin cache
-      const unsigned codeposition = query.queryOrigin->prevPC->info->id;
-      auto qit = std::lower_bound(queryOriginCache.begin(), queryOriginCache.end(), codeposition, qOCacheItemCompare_Lower);
-      //search all cache entries for this code position
-      while (qit != queryOriginCache.end() and qit->first == codeposition){
-          if (qit->second->first != ce){
-              ++stats::queryOriginCacheHits;
-              result = (negationUsed ?
-                        IncompleteSolver::negatePartialValidity(qit->second->second) :
-                        qit->second->second);
-              return true;
+      //get current code position
+      if (query.queryOrigin and query.queryOrigin->prevPC){
+          const unsigned codeposition = query.queryOrigin->prevPC->info->id;
+          //lookup query origin cache
+          auto qit = std::lower_bound(queryOriginCache.begin(), queryOriginCache.end(), codeposition, qOCacheItemCompare_Lower);
+          //search all cache entries for this code position
+          while (qit != queryOriginCache.end() and qit->first == codeposition){
+              if (qit->second->first != ce){
+                  ++stats::queryOriginCacheHits;
+                  result = (negationUsed ?
+                            IncompleteSolver::negatePartialValidity(qit->second->second) :
+                            qit->second->second);
+                  return true;
+              }
+              qit++;
           }
-          qit++;
       }
   }
 
@@ -194,9 +197,15 @@ void CachingSolver::cacheInsert(const Query& query,
 
   auto itpair = cache.insert(std::make_pair(ce, cachedResult));
 
-  const unsigned codeposition = query.queryOrigin->prevPC->info->id;
-  auto qit = std::upper_bound(queryOriginCache.begin(), queryOriginCache.end(), codeposition, qOCacheItemCompare_Upper);
-  queryOriginCache.insert(qit, std::make_pair(codeposition, itpair.first));
+  { //QueryOriginCache
+      TimerStatIncrementer t(stats::queryOriginTime);
+      //get current code position
+      if (query.queryOrigin and query.queryOrigin->prevPC){
+          const unsigned codeposition = query.queryOrigin->prevPC->info->id;
+          auto qit = std::upper_bound(queryOriginCache.begin(), queryOriginCache.end(), codeposition, qOCacheItemCompare_Upper);
+          queryOriginCache.insert(qit, std::make_pair(codeposition, itpair.first));
+      }
+  }
 }
 
 bool CachingSolver::computeValidity(const Query& query,
