@@ -441,7 +441,7 @@ void StatsTracker::writeStatsHeader() {
 	     << "'SerializerTime',"
 	     << "'AddConstraintTime',"
              << "'QueryOriginCacheHits' ,"
-             << "'QueryOriginTime' ,"
+             << "'QueryOriginTime'"
              << ")\n";
   statsFile->flush();
 }
@@ -480,7 +480,7 @@ void StatsTracker::writeStatsLine() {
 	     << "," << stats::serializerTime
 	     << "," << stats::addConstraintTime
              << "," << stats::queryOriginCacheHits
-             << "," << stats::queryOriginTime
+             << "," << stats::queryOriginTime / 1000000.
              << ")\n";
   statsFile->flush();
 }
