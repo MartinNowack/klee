@@ -175,8 +175,8 @@ unsigned InstructionInfoTable::getMaxID() const {
 
 const InstructionInfo &
 InstructionInfoTable::getInfo(const Instruction *inst) const {
-  std::map<const llvm::Instruction*, InstructionInfo>::const_iterator it = 
-    infos.find(inst);
+  unordered_map<const llvm::Instruction *, InstructionInfo>::const_iterator it =
+      infos.find(inst);
   if (it == infos.end())
     llvm::report_fatal_error("invalid instruction, not present in "
                              "initial module!");
