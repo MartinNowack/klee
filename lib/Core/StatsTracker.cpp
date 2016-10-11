@@ -106,7 +106,13 @@ namespace {
   UncoveredUpdateInterval("uncovered-update-interval",
                           cl::init(30.),
 			  cl::desc("(default=30.0s)"));
-  
+
+  cl::opt<unsigned> UncoveredUpdateAfterInstructions(
+      "uncovered-update-after-instructions", cl::init(0),
+      cl::desc(
+          "Update uncovered information after n instructions, 0 to disable it"
+          "(default=0)"));
+
   cl::opt<bool>
   UseCallPaths("use-call-paths",
 	       cl::init(true),
@@ -254,10 +260,12 @@ StatsTracker::StatsTracker(Executor &_executor, std::string _objectFilename,
       executor.addTimer(new WriteStatsTimer(this), StatsWriteInterval);
   }
 
-  // Add timer to calculate uncovered instructions if needed by the solver
+  // Add timer to calculate uncovered instructions if needed by the searcher
   if (updateMinDistToUncovered) {
     computeReachableUncovered();
-    executor.addTimer(new UpdateReachableTimer(this), UncoveredUpdateInterval);
+    if (UncoveredUpdateInterval > 0)
+      executor.addTimer(new UpdateReachableTimer(this),
+                        UncoveredUpdateInterval);
   }
 
   if (OutputIStats) {
@@ -339,6 +347,10 @@ void StatsTracker::stepInstruction(ExecutionState &es) {
   if (istatsFile && IStatsWriteAfterInstructions &&
       stats::instructions % IStatsWriteAfterInstructions.getValue() == 0)
     writeIStats();
+
+  if (updateMinDistToUncovered && UncoveredUpdateAfterInstructions &&
+      stats::instructions % UncoveredUpdateAfterInstructions.getValue() == 0)
+    computeReachableUncovered();
 }
 
 ///
