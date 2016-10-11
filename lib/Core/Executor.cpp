@@ -430,6 +430,12 @@ Executor::Executor(const InterpreterOptions &opts, InterpreterHandler *ih)
       klee_error("Could not open file %s : %s", stack_track_file_name.c_str(),
                  ErrorInfo.c_str());
     }
+
+    if (coreSolverTimeout && !UseForkedCoreSolver &&
+        (CoreSolverToUse == STP_SOLVER)) {
+      klee_error("Using solver timeout can only be allowing the STP solver to "
+                 "be forked.");
+    }
   }
 }
 
