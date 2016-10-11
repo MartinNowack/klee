@@ -14,6 +14,15 @@
 #include <string>
 #include <set>
 
+#include <ciso646>
+#ifdef _LIBCPP_VERSION
+#include <unordered_map>
+#define unordered_map std::unordered_map
+#else
+#include <tr1/unordered_map>
+#define unordered_map std::tr1::unordered_map
+#endif
+
 namespace llvm {
   class Function;
   class Instruction;
@@ -50,7 +59,7 @@ namespace klee {
 
     std::string dummyString;
     InstructionInfo dummyInfo;
-    std::map<const llvm::Instruction*, InstructionInfo> infos;
+    unordered_map<const llvm::Instruction *, InstructionInfo> infos;
     std::set<const std::string *, ltstr> internedStrings;
 
   private:
