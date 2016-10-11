@@ -202,10 +202,10 @@ namespace {
 		      cl::desc("Issue an warning everytime an external call is made," 
 			       "as opposed to once per function (default=off)"));
 
-  cl::opt<bool>
-  OnlyOutputStatesCoveringNew("only-output-states-covering-new",
-                              cl::init(false),
-			      cl::desc("Only output test cases covering new code (default=off)."));
+  cl::opt<bool> OnlyOutputStatesCoveringNew(
+      "only-output-states-covering-new", cl::init(false),
+      cl::desc("Only output test cases covering new code (default=off). This "
+               "will enable coverage tracking."));
 
   cl::opt<bool>
   EmitAllErrors("emit-all-errors",
@@ -452,11 +452,11 @@ const Module *Executor::setModule(llvm::Module *module,
   kmodule->prepare(opts, interpreterHandler);
   specialFunctionHandler->bind();
 
-  if (StatsTracker::useStatistics() || userSearcherRequiresMD2U()) {
-    statsTracker = 
-      new StatsTracker(*this,
-                       interpreterHandler->getOutputFilename("assembly.ll"),
-                       userSearcherRequiresMD2U());
+  if (StatsTracker::useStatistics() || userSearcherRequiresMD2U() ||
+      OnlyOutputStatesCoveringNew) {
+    statsTracker = new StatsTracker(
+        *this, interpreterHandler->getOutputFilename("assembly.ll"),
+        userSearcherRequiresMD2U() || OnlyOutputStatesCoveringNew);
   }
   
   return module;
