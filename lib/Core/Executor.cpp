@@ -465,7 +465,7 @@ const Module *Executor::setModule(llvm::Module *module,
       OnlyOutputStatesCoveringNew) {
     statsTracker = new StatsTracker(
         *this, interpreterHandler->getOutputFilename("assembly.ll"),
-        userSearcherRequiresMD2U() || OnlyOutputStatesCoveringNew);
+        userSearcherRequiresMD2U(), OnlyOutputStatesCoveringNew);
   }
   
   return module;
