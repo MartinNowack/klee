@@ -184,7 +184,7 @@ static bool instructionIsCoverable(Instruction *i) {
 }
 
 StatsTracker::StatsTracker(Executor &_executor, std::string _objectFilename,
-                           bool _updateMinDistToUncovered)
+                           bool _updateMinDistToUncovered, bool _trackCoverage)
   : executor(_executor),
     objectFilename(_objectFilename),
     statsFile(0),
@@ -193,7 +193,7 @@ StatsTracker::StatsTracker(Executor &_executor, std::string _objectFilename,
     numBranches(0),
     fullBranches(0),
     partialBranches(0),
-    updateMinDistToUncovered(_updateMinDistToUncovered) {
+    updateMinDistToUncovered(_updateMinDistToUncovered), trackCoverage(_trackCoverage) {
 
   if (StatsWriteAfterInstructions > 0 && StatsWriteInterval > 0)
     klee_error("Both options --stats-write-interval and "
@@ -224,7 +224,7 @@ StatsTracker::StatsTracker(Executor &_executor, std::string _objectFilename,
     }
   }
 
-  if (OutputIStats || updateMinDistToUncovered)
+  if (OutputIStats || updateMinDistToUncovered || trackCoverage)
     theStatisticManager->useIndexedStats(km->infos->getMaxID());
 
   for (std::vector<KFunction*>::iterator it = km->functions.begin(), 
@@ -235,7 +235,7 @@ StatsTracker::StatsTracker(Executor &_executor, std::string _objectFilename,
     for (unsigned i=0; i<kf->numInstructions; ++i) {
       KInstruction *ki = kf->instructions[i];
 
-      if (OutputIStats || updateMinDistToUncovered) {
+      if (OutputIStats || updateMinDistToUncovered || trackCoverage) {
         unsigned id = ki->info->id;
         theStatisticManager->setIndex(id);
         if (kf->trackCoverage && instructionIsCoverable(ki->inst))
@@ -296,7 +296,7 @@ void StatsTracker::done() {
 }
 
 void StatsTracker::stepInstruction(ExecutionState &es) {
-  if (OutputIStats || updateMinDistToUncovered) {
+  if (OutputIStats || updateMinDistToUncovered || trackCoverage) {
     if (TrackInstructionTime) {
       static sys::TimeValue lastNowTime(0,0),lastUserTime(0,0);
     
@@ -319,7 +319,9 @@ void StatsTracker::stepInstruction(ExecutionState &es) {
     const InstructionInfo &ii = *es.pc->info;
     StackFrame &sf = es.stack.back();
     theStatisticManager->setIndex(ii.id);
-    theStatisticManager->setContext(&sf.callPathNode->statistics);
+
+    if (UseCallPaths)
+      theStatisticManager->setContext(&sf.callPathNode->statistics);
 
     if (es.instsSinceCovNew)
       ++es.instsSinceCovNew;
@@ -385,7 +387,7 @@ void StatsTracker::framePopped(ExecutionState &es) {
 
 void StatsTracker::markBranchVisited(ExecutionState *visitedTrue, 
                                      ExecutionState *visitedFalse) {
-  if (OutputIStats || updateMinDistToUncovered) {
+  if (OutputIStats || updateMinDistToUncovered || trackCoverage) {
     unsigned id = theStatisticManager->getIndex();
     uint64_t hasTrue = theStatisticManager->getIndexedValue(stats::trueBranches, id);
     uint64_t hasFalse = theStatisticManager->getIndexedValue(stats::falseBranches, id);

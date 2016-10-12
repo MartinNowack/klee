@@ -46,6 +46,8 @@ namespace klee {
 
     bool updateMinDistToUncovered;
 
+    bool trackCoverage;
+
   public:
     static bool useStatistics();
 
@@ -57,7 +59,7 @@ namespace klee {
 
   public:
     StatsTracker(Executor &_executor, std::string _objectFilename,
-                 bool _updateMinDistToUncovered);
+                 bool updateMinDistToUncovered, bool trackCoverage);
     ~StatsTracker();
 
     // called after a new StackFrame has been pushed (for callpath tracing)
