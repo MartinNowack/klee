@@ -78,8 +78,10 @@ public:
     /// symbolic execution on concrete programs.
     unsigned MakeConcreteSymbolic;
 
+    bool GeneratCoverageInformationPerState;
     InterpreterOptions()
-      : MakeConcreteSymbolic(false)
+      : MakeConcreteSymbolic(false),
+        GeneratCoverageInformationPerState(false)
     {}
   };
 
