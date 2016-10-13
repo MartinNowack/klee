@@ -384,17 +384,20 @@ Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
   activeSolver = &active_incremental_solvers[1];
 
   // Generate big query iset
-  // XXX we do not add expression, to not restrict too much ??
   IndependentElementSet query_iset;
+  IndependentElementSet expr_iset(q.expr);
+
   std::vector<ref<Expr> > constraints_to_add;
   std::vector<ConstraintPosition> constraint_position;
 
   std::set<size_t> positions;
 
+  // Generate new iset
   size_t iset_cntr = 0;
   for (auto i = q.constraints.iset_begin(), e = q.constraints.iset_end();
        i != e; ++i, ++iset_cntr) {
     query_iset.add(*i);
+    // XXX we have a second copy of the sets here
     constraints_to_add.insert(constraints_to_add.end(), (*i).exprs.begin(),
                               (*i).exprs.end());
     constraint_position.insert(constraint_position.end(),
@@ -405,27 +408,41 @@ Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
   size_t reused = constraints_to_add.size();
 
   // Simple, we just check how many constraints we have in common and remove
-  // the uncommon ones
-  // Each indep set contains one stack frame of constraints
+  // the uncommon ones.
+  //
+  // Each stack frame of the solver is equivalent to one independent set for it
   size_t maxStackDepth = 0;
   for (auto &iset : activeSolver->used_expression) {
-    if (!iset.intersects(query_iset)) {
+
+    // Check if this iset intersects with the query. In that case, we can ignore it.
+    bool iset_query_intersection = iset.intersects(query_iset);
+    bool iset_expr_intersection = expr_iset.intersects(iset);
+    if (!iset_query_intersection && !iset_expr_intersection) {
       // if it doesn't intersect, we can use that frame
       ++maxStackDepth;
       continue;
     }
+
+    // In case it does not conflict with the query constraints,
+    // it does conflict with the query induction.
+    // In that case the induction might get constraint too much
+    if (!iset_expr_intersection) {
+      break;
+    }
+
     // if we have the same expression, we can use it
     // otherwise, we have to abort
     bool abort = false;
 
     std::vector<size_t> temp_found_expressions;
-
     auto expr_cntr = 0;
+
+    // Now check if any constraint of this frame of the solver state
+    // conflicts with a constraint of the query
     for (auto expr : iset.exprs) {
       // check if position is part of the query
       auto &solver_expr_position =
           activeSolver->used_positions[maxStackDepth][expr_cntr];
-
       bool found = false;
       for (auto pos_it = constraint_position.begin(),
                 pos_itE = constraint_position.end();
@@ -436,10 +453,10 @@ Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
                                            constraint_position.begin());
           break;
         }
-        if (found)
-          break;
       }
+
       expr_cntr++;
+      // We found it, so it's part of a previous constraint ignore it.
       if (found)
         continue;
 
