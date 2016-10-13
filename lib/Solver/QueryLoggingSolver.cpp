@@ -109,6 +109,8 @@ void QueryLoggingSolver::finishQuery(bool success, const Query & query) {
   logBuffer << queryCommentSign
             << "   AddedConstraints: " << query.added_constraints << "\n";
   logBuffer << queryCommentSign << "   SolverId: " << query.solver_id << "\n";
+  logBuffer << queryCommentSign << "   StackDepth: " << query.solver_state_stack_height << "\n";
+
 }
 
 void QueryLoggingSolver::flushBuffer() {
