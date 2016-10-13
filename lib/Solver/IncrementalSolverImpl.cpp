@@ -481,6 +481,8 @@ Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
   activeSolver->used_expression.erase(activeSolver->used_expression.begin() +
                                           maxStackDepth,
                                       activeSolver->used_expression.end());
+  activeSolver->used_positions.erase(activeSolver->used_positions.begin() + maxStackDepth,
+      activeSolver->used_positions.end());
 
   // Will use this solver
   // Update statistics and save constraints
