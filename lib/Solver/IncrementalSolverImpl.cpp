@@ -509,6 +509,7 @@ Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
   q.query_size = new_size;
   q.added_constraints = constraints_to_add.size();
   q.solver_id = activeSolver->solver_id;
+  q.solver_state_stack_height = maxStackDepth;
 
   //  llvm::errs() << "Level: " << maxStackDepth <<
   //      " I:" << !constraints_to_add.empty() << "\n";
