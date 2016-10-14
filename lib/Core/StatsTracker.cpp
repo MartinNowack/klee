@@ -438,6 +438,7 @@ void StatsTracker::writeStatsHeader() {
              << "'CacheMisses',"
              << "'QueryOriginCacheHits' ,"
              << "'QueryOriginTime'"
+             << "'QueryOriginCacheReplace'"
              << ")\n";
   statsFile->flush();
 }
@@ -474,6 +475,7 @@ void StatsTracker::writeStatsLine() {
              << "," << stats::queryCacheMisses
              << "," << stats::queryOriginCacheHits
              << "," << stats::queryOriginTime / 1000000.
+             << "," << stats::queryOriginCacheReplace
              << ")\n";
   statsFile->flush();
 }
