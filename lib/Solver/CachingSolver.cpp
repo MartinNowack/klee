@@ -84,7 +84,7 @@ private:
   Solver *solver;
   cache_map cache;
 
-  typedef std::pair<unsigned, cache_map::iterator> QOCacheItem;
+  typedef std::pair<unsigned, const CacheItem*> QOCacheItem;
 
   static inline bool qOCacheItemCompare_Lower(const QOCacheItem& it, const unsigned& val){
       return it.first < val;
@@ -203,7 +203,7 @@ void CachingSolver::cacheInsert(const Query& query,
       if (query.queryOrigin and query.queryOrigin->prevPC){
           const unsigned codeposition = query.queryOrigin->prevPC->info->id;
           auto qit = std::upper_bound(queryOriginCache.begin(), queryOriginCache.end(), codeposition, qOCacheItemCompare_Upper);
-          queryOriginCache.insert(qit, std::make_pair(codeposition, itpair.first));
+          queryOriginCache.insert(qit, std::make_pair(codeposition, &*itpair.first));
       }
   }
 }
