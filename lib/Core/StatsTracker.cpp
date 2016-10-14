@@ -436,8 +436,8 @@ void StatsTracker::writeStatsHeader() {
 #endif
              << "'CacheHits',"
              << "'CacheMisses',"
-             << "'QueryOriginCacheHits' ,"
-             << "'QueryOriginTime'"
+             << "'QueryOriginCacheHits',"
+             << "'QueryOriginTime',"
              << "'QueryOriginCacheReplace'"
              << ")\n";
   statsFile->flush();
