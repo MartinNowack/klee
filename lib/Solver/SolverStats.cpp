@@ -36,3 +36,4 @@ Statistic stats::arrayHashTime("ArrayHashTime", "AHtime");
 
 Statistic stats::queryOriginCacheHits("QueryOriginCacheHits", "QOCHits") ;
 Statistic stats::queryOriginTime("QueryOriginCacheTime", "QOCTime") ;
+Statistic stats::queryOriginCacheReplace("QueryOriginCacheReplace", "QOCReplace") ;

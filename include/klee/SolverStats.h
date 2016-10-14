@@ -39,6 +39,7 @@ namespace stats {
 
   extern Statistic queryOriginCacheHits;
   extern Statistic queryOriginTime;
+  extern Statistic queryOriginCacheReplace;
 
 }
 }

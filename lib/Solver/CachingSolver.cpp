@@ -231,6 +231,7 @@ bool CachingSolver::computeValidity(const Query& query,
       ++stats::queryCacheMisses;
       if (!solver->impl->computeTruth(query, tmp))
         return false;
+      ++stats::queryOriginCacheReplace;
       if (tmp) {
         cacheInsert(query, IncompleteSolver::MustBeTrue);
         result = Solver::True;
@@ -245,6 +246,7 @@ bool CachingSolver::computeValidity(const Query& query,
       ++stats::queryCacheMisses;
       if (!solver->impl->computeTruth(query.negateExpr(), tmp))
         return false;
+      ++stats::queryOriginCacheReplace;
       if (tmp) {
         cacheInsert(query, IncompleteSolver::MustBeFalse);
         result = Solver::False;
@@ -307,6 +309,9 @@ bool CachingSolver::computeTruth(const Query& query,
     cachedResult = IncompleteSolver::MayBeFalse;
   }
   
+  if (cacheHit)
+      ++stats::queryOriginCacheReplace;
+
   cacheInsert(query, cachedResult);
   return true;
 }

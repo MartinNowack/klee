@@ -442,6 +442,7 @@ void StatsTracker::writeStatsHeader() {
 	     << "'AddConstraintTime',"
              << "'QueryOriginCacheHits' ,"
              << "'QueryOriginTime'"
+             << "'QueryOriginCacheReplace'"
              << ")\n";
   statsFile->flush();
 }
@@ -481,6 +482,7 @@ void StatsTracker::writeStatsLine() {
 	     << "," << stats::addConstraintTime
              << "," << stats::queryOriginCacheHits
              << "," << stats::queryOriginTime / 1000000.
+             << "," << stats::queryOriginCacheReplace
              << ")\n";
   statsFile->flush();
 }
