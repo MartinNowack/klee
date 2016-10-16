@@ -24,6 +24,10 @@ llvm::cl::opt<bool> NaiveIncremental(
     "naive-incremental",
     llvm::cl::desc("Ignore any solver failures (default=off)"),
     llvm::cl::init(false));
+llvm::cl::opt<int>
+    ParallelIncSolvers("parallel-incremental-solvers",
+                       llvm::cl::desc("Ignore any solver failures (default=4)"),
+                       llvm::cl::init(8));
 }
 namespace klee {
 
@@ -66,7 +70,8 @@ private:
 
 public:
   IncrementalSolverImpl(Solver *solver)
-      : max_solvers(5), active_solvers(0), activeSolver(nullptr) {
+      : max_solvers(ParallelIncSolvers), active_solvers(0),
+        activeSolver(nullptr) {
     // Add basic core solver
     SolvingState state(solver);
     active_incremental_solvers.push_back(std::move(state));
