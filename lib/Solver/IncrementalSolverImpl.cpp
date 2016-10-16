@@ -127,9 +127,9 @@ public:
 
 protected:
   Query getPartialQuery(const Query &q);
-  Query getPartialQuery_simple_incremental(const Query &q);
   Query getPartialQuery_naive_incremental(const Query &q);
 
+  Query getPartialQuery_simple_incremental(const Query &q);
 
   size_t selectBestSolver(const Query &q,
                           std::vector<std::vector<const Array *> > &objects,
@@ -497,17 +497,12 @@ Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
   SimpleConstraintManager cm(activeConstraints);
   cm.clear();
 
-  // We'll use the one solver available
-  activeSolver = &active_incremental_solvers[1];
-
   // Generate big query iset
   IndependentElementSet query_iset;
   IndependentElementSet expr_iset(q.expr);
 
   std::vector<ref<Expr> > constraints_to_add;
   std::vector<ConstraintPosition> constraint_position;
-
-  std::set<size_t> positions;
 
   // Generate new iset
   size_t iset_cntr = 0;
@@ -521,94 +516,137 @@ Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
                                q.constraints.origPosition[iset_cntr].begin(),
                                q.constraints.origPosition[iset_cntr].end());
   }
+  size_t constraints_of_query = constraints_to_add.size();
 
-  size_t reused = constraints_to_add.size();
+  // Select best suited solver
+  std::vector<std::set<size_t> > solver_positions;
+  solver_positions.push_back(std::set<size_t>());
 
-  // Simple, we just check how many constraints we have in common and remove
-  // the uncommon ones.
-  //
-  // Each stack frame of the solver is equivalent to one independent set for it
-  size_t maxStackDepth = 0;
-  for (auto &iset : activeSolver->used_expression) {
+  std::vector<size_t> solver_max_stack_depth;
+  solver_max_stack_depth.push_back(0); // Handle 0 solver
 
-    // Check if this iset intersects with the query. In that case, we can ignore it.
-    bool iset_query_intersection = iset.intersects(query_iset);
-    bool iset_expr_intersection = expr_iset.intersects(iset);
-    if (!iset_query_intersection && !iset_expr_intersection) {
-      // if it doesn't intersect, we can use that frame
+  size_t max_inactive = 0;
+  for (size_t solver_id = 1; solver_id < active_solvers; ++solver_id) {
+    // Simple, we just check how many constraints we have in common and remove
+    // the uncommon ones.
+    //
+    // Each stack frame of the solver is equivalent to one independent set for
+    // it
+    size_t maxStackDepth = 0;
+    solver_positions.push_back(std::set<size_t>());
+    //    std::set<size_t> positions;
+
+    SolvingState *currentSolver = &active_incremental_solvers[solver_id];
+    currentSolver->inactive++;
+
+    max_inactive =
+        (currentSolver->inactive > max_inactive ? currentSolver->inactive
+                                                : max_inactive);
+
+    for (auto &iset : currentSolver->used_expression) {
+      // Check if this iset intersects with the query. In that case, we can
+      // ignore it.
+      bool iset_query_intersection = iset.intersects(query_iset);
+      bool iset_expr_intersection = expr_iset.intersects(iset);
+      if (!iset_query_intersection && !iset_expr_intersection) {
+        // if it doesn't intersect, we can use that frame
+        ++maxStackDepth;
+        continue;
+      }
+
+      // if we have the same expression, we can use it
+      // otherwise, we have to abort
+      bool abort = false;
+
+      std::vector<size_t> temp_found_expressions;
+      auto expr_cntr = 0;
+
+      // Now check if any constraint of this frame of the solver state
+      // conflicts with a constraint of the query
+      for (auto expr : iset.exprs) {
+        // check if position is part of the query
+        auto &solver_expr_position =
+            currentSolver->used_positions[maxStackDepth][expr_cntr];
+        bool found = false;
+        for (auto pos_it = constraint_position.begin(),
+                  pos_itE = constraint_position.end();
+             pos_it != pos_itE; ++pos_it) {
+          if (contains(solver_expr_position, *pos_it)) {
+            found = true;
+            temp_found_expressions.push_back(pos_it -
+                                             constraint_position.begin());
+            break;
+          }
+        }
+
+        expr_cntr++;
+        // We found it, so it's part of a previous constraint ignore it.
+        if (found)
+          continue;
+
+        // Check if we find that query in our constraints
+        auto it = std::find(constraints_to_add.begin(),
+                            constraints_to_add.end(), expr);
+        if (it != constraints_to_add.end()) {
+          temp_found_expressions.push_back(it - constraints_to_add.begin());
+          continue; // yes, check the next
+        }
+
+        // no, so we have to abort
+        abort = true;
+        break;
+      }
+
+      if (abort)
+        break;
+
+      // delete the found expressions
+      solver_positions[solver_id].insert(temp_found_expressions.begin(),
+                                         temp_found_expressions.end());
       ++maxStackDepth;
-      continue;
     }
+    solver_max_stack_depth.push_back(maxStackDepth);
+  }
 
-    // In case it does not conflict with the query constraints,
-    // it does conflict with the query induction.
-    // In that case the induction might get constraint too much
-    if (!iset_expr_intersection) {
-      break;
+  // Now select the best suitabel solver
+
+  size_t max_reuse = 0;
+  size_t best_solver = 0, current_solver = 0;
+  for (auto &reuse : solver_positions) {
+    if (reuse.size() > max_reuse) {
+      max_reuse = reuse.size();
+      best_solver = current_solver;
     }
+    ++current_solver;
+  }
 
-    // if we have the same expression, we can use it
-    // otherwise, we have to abort
-    bool abort = false;
+  // none found, select the next free or reuse one
+  size_t maxStackDepth = 0;
 
-    std::vector<size_t> temp_found_expressions;
-    auto expr_cntr = 0;
-
-    // Now check if any constraint of this frame of the solver state
-    // conflicts with a constraint of the query
-    for (auto expr : iset.exprs) {
-      // check if position is part of the query
-      auto &solver_expr_position =
-          activeSolver->used_positions[maxStackDepth][expr_cntr];
-      bool found = false;
-      for (auto pos_it = constraint_position.begin(),
-                pos_itE = constraint_position.end();
-           pos_it != pos_itE; ++pos_it) {
-        if (contains(solver_expr_position, *pos_it)) {
-          found = true;
-          temp_found_expressions.push_back(pos_it -
-                                           constraint_position.begin());
+  if (!best_solver) {
+    // Check if we still have space for a new solver
+    if (active_solvers < max_solvers) {
+      // Yes, use the next free solver
+      activeSolver = &active_incremental_solvers[active_solvers];
+      ++active_solvers;
+    } else {
+      // No, search for the oldest unused one
+      for (size_t i = 1; i < max_solvers; ++i) {
+        if (active_incremental_solvers[i].inactive == max_inactive) {
+          activeSolver = &active_incremental_solvers[i];
           break;
         }
       }
-
-      expr_cntr++;
-      // We found it, so it's part of a previous constraint ignore it.
-      if (found)
-        continue;
-
-      // Check if we find that query in our constraints
-      auto it =
-          std::find(constraints_to_add.begin(), constraints_to_add.end(), expr);
-      if (it != constraints_to_add.end()) {
-        temp_found_expressions.push_back(it - constraints_to_add.begin());
-        continue; // yes, check the next
-      }
-
-      // no, so we have to abort
-      abort = true;
-      break;
     }
-
-    if (abort)
-      break;
-
-    // delete the found expressions
-    positions.insert(temp_found_expressions.begin(),
-                     temp_found_expressions.end());
-    ++maxStackDepth;
-  }
-
-  for (auto i = positions.rbegin(), e = positions.rend(); i != e; ++i) {
-    constraints_to_add.erase(constraints_to_add.begin() + *i);
-    constraint_position.erase(constraint_position.begin() + *i);
-  }
-
-  //   Throw away old queries
-  if (reused - constraints_to_add.size() == 0) {
-    // If we cannot reuse any constraints,
-    // don't bother to use existing one
-    maxStackDepth = 0;
+  } else {
+    activeSolver = &active_incremental_solvers[best_solver];
+    for (auto i = solver_positions[best_solver].rbegin(),
+              e = solver_positions[best_solver].rend();
+         i != e; ++i) {
+      constraints_to_add.erase(constraints_to_add.begin() + *i);
+      constraint_position.erase(constraint_position.begin() + *i);
+    }
+    maxStackDepth = solver_max_stack_depth[best_solver];
   }
 
   // Clean up previous levels
@@ -618,6 +656,7 @@ Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
   activeSolver->used_positions.erase(activeSolver->used_positions.begin() + maxStackDepth,
       activeSolver->used_positions.end());
 
+  activeSolver->inactive = 0;
   // Will use this solver
   // Update statistics and save constraints
   size_t new_size = 0;
@@ -647,7 +686,7 @@ Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
   if (maxStackDepth) {
     ++stats::queryIncremental;
     q.incremental_flag = true;
-    q.reused_cntr += (reused - constraints_to_add.size());
+    q.reused_cntr += (constraints_of_query - constraints_to_add.size());
   }
   auto newQ = Query(activeConstraints, q.expr, q.queryOrigin);
 
