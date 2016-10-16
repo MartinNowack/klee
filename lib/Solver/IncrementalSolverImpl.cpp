@@ -453,6 +453,9 @@ Query IncrementalSolverImpl::getPartialQuery_naive_incremental(
   q.added_constraints = constraints_to_add.size();
   q.solver_id = activeSolver->solver_id;
 
+  if (constraints_to_remove.empty())
+	  maxStackDepth = 0;
+
   // Clean up previous levels
   activeSolver->used_expression.erase(activeSolver->used_expression.begin() +
                                           maxStackDepth,
