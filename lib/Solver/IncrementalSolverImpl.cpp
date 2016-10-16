@@ -19,6 +19,12 @@
 #include <memory>
 #include <unordered_set>
 
+namespace {
+llvm::cl::opt<bool> NaiveIncremental(
+    "naive-incremental",
+    llvm::cl::desc("Ignore any solver failures (default=off)"),
+    llvm::cl::init(false));
+}
 namespace klee {
 
 struct SolvingState {
@@ -122,6 +128,8 @@ public:
 protected:
   Query getPartialQuery(const Query &q);
   Query getPartialQuery_simple_incremental(const Query &q);
+  Query getPartialQuery_naive_incremental(const Query &q);
+
 
   size_t selectBestSolver(const Query &q,
                           std::vector<std::vector<const Array *> > &objects,
@@ -375,6 +383,112 @@ size_t IncrementalSolverImpl::selectBestSolver(
   return solver_index;
 }
 
+Query IncrementalSolverImpl::getPartialQuery_naive_incremental(
+    const Query &q) {
+  SimpleConstraintManager cm(activeConstraints);
+  cm.clear();
+
+  // We'll use the one solver available
+  activeSolver = &active_incremental_solvers[1];
+
+  // Generate big query iset
+  IndependentElementSet query_constraint_iset;
+  IndependentElementSet query_expr_iset(q.expr);
+
+  std::set<ref<Expr> > constraints_to_add;
+  std::set<ref<Expr> > constraints_to_remove;
+
+  for (auto i = q.constraints.iset_begin(), e = q.constraints.iset_end();
+       i != e; ++i) {
+    query_constraint_iset.add(*i);
+    constraints_to_add.insert((*i).exprs.begin(), (*i).exprs.end());
+  }
+
+  size_t reused = constraints_to_add.size();
+
+  // Simple, we just check how many constraints we have in common and remove
+  // the uncommon ones
+  // Each indep set contains one stack frame of constraints
+  size_t maxStackDepth = 0;
+  for (auto &solver_frame : activeSolver->used_expression) {
+    if (!solver_frame.intersects(query_constraint_iset) && !solver_frame.intersects(query_expr_iset)) {
+      // if the solver stack frame doesn't intersect, we can keep that frame
+      ++maxStackDepth;
+      continue;
+    }
+
+    // if we have the same expression, we can use it
+    // otherwise, we have to abort
+    bool abort = false;
+    std::vector<ref<Expr> > temp_found_expressions;
+    for (auto expr : solver_frame.exprs) {
+      // Check if we find that query in our constraints
+      auto it =
+          std::find(constraints_to_add.begin(), constraints_to_add.end(), expr);
+      if (it != constraints_to_add.end()) {
+        temp_found_expressions.push_back(expr);
+        continue; // yes, check the next
+      }
+
+      // no, so we have to abort
+      abort = true;
+      break;
+    }
+
+    if (abort)
+      break;
+
+    // delete the found expressions
+    constraints_to_remove.insert(temp_found_expressions.begin(), temp_found_expressions.end());
+    ++maxStackDepth;
+  }
+
+  // Remove the remaining constraints
+  for (auto & exp:constraints_to_remove)
+    constraints_to_add.erase(exp);
+
+  // Will use this solver
+  // Update statistics and save constraints
+  q.query_size = activeSolver->usedConstraints.size();
+  q.added_constraints = constraints_to_add.size();
+  q.solver_id = activeSolver->solver_id;
+
+  // Clean up previous levels
+  activeSolver->used_expression.erase(activeSolver->used_expression.begin() +
+                                          maxStackDepth,
+                                      activeSolver->used_expression.end());
+
+  //  llvm::errs() << "Level: " << maxStackDepth <<
+  //      " I:" << !constraints_to_add.empty() << "\n";
+
+  if (!constraints_to_add.empty()) {
+    IndependentElementSet iset;
+    for (auto &e : constraints_to_add) {
+      iset.add(IndependentElementSet(e));
+      cm.push_back(e);
+    }
+    activeSolver->used_expression.push_back(std::move(iset));
+  }
+
+  activeSolver->solver->impl->popStack(maxStackDepth);
+
+  // We found one existing solver, update stats
+  if (maxStackDepth) {
+    ++stats::queryIncremental;
+    q.incremental_flag = true;
+    q.reused_cntr += (reused - constraints_to_add.size());
+  }
+  auto newQ = Query(activeConstraints, q.expr, q.queryOrigin);
+
+  //  llvm::errs() << "Old query\n";
+  //  q.dump();
+  //
+  //  llvm::errs() << "New query\n";
+  //  newQ.dump();
+
+  return newQ;
+}
+
 Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
     const Query &q) {
   SimpleConstraintManager cm(activeConstraints);
@@ -552,6 +666,8 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
     return q;
   }
 
+  if (NaiveIncremental)
+    return getPartialQuery_naive_incremental(q);
   return getPartialQuery_simple_incremental(q);
 
   SimpleConstraintManager cm(activeConstraints);
