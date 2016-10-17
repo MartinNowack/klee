@@ -514,19 +514,21 @@ Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
   //  llvm::errs() << "Level: " << maxStackDepth <<
   //      " I:" << !constraints_to_add.empty() << "\n";
 
-//  if (!constraints_to_add.empty()) {
+  if (!constraints_to_add.empty()) {
     IndependentElementSet iset;
     for (auto &e : constraints_to_add) {
       iset.add(IndependentElementSet(e));
       cm.push_back(e);
     }
-    // Add implication
-    iset.add(IndependentElementSet(q.expr));
-    constraint_position.push_back(ConstraintPosition(0,0,0));
-
     activeSolver->used_expression.push_back(std::move(iset));
     activeSolver->used_positions.push_back(constraint_position);
-//  }
+  }
+
+  // Add expression of the query
+  constraint_position.clear();
+  constraint_position.push_back(ConstraintPosition(0,0,0));
+  activeSolver->used_expression.push_back(IndependentElementSet(q.expr));
+  activeSolver->used_positions.push_back(constraint_position);
 
   activeSolver->solver->impl->popStack(maxStackDepth);
 

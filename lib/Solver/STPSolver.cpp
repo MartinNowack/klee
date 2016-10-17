@@ -422,6 +422,10 @@ bool STPSolverImpl::computePartialInitialValues(
     klee_warning("STP query:%u\n%.*s\n", counter++, (unsigned)len, buf);
     free(buf);
   }
+  if (incremental){
+    vc_push(vc);
+    ++stackIndex;
+  }
 
   bool success;
   if (useForkedSTP) {
