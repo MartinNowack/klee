@@ -979,8 +979,7 @@ SolverImpl::SolverRunStatus IncrementalSolverImpl::getOperationStatusCode() {
 }
 
 char *IncrementalSolverImpl::getConstraintLog(const Query &q) {
-  auto newQuery = getPartialQuery(q);
-  return activeSolver->solver->impl->getConstraintLog(newQuery);
+  return solvers[0]->impl->getConstraintLog(q);
 }
 
 void IncrementalSolverImpl::setCoreSolverTimeout(double timeout) {
