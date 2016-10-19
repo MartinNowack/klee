@@ -17,8 +17,6 @@
 
 #include "klee/SolverStats.h"
 #include "klee/ExecutionState.h"
-#include "klee/Internal/Module/KInstruction.h"
-#include "klee/Internal/Module/InstructionInfoTable.h"
 #include "klee/TimerStatIncrementer.h"
 
 #include <ciso646>
@@ -31,6 +29,10 @@
 #define unordered_map std::tr1::unordered_map
 #endif
 #include <vector>
+
+namespace klee {
+	class KInstruction;
+}
 
 using namespace klee;
 
@@ -84,13 +86,13 @@ private:
   Solver *solver;
   cache_map cache;
 
-  typedef std::pair<unsigned, const CacheItem*> QOCacheItem;
+  typedef std::pair<const KInstruction*, const CacheItem*> QOCacheItem;
 
-  static inline bool qOCacheItemCompare_Lower(const QOCacheItem& it, const unsigned& val){
+  static inline bool qOCacheItemCompare_Lower(const QOCacheItem& it, const KInstruction* val){
       return it.first < val;
   }
 
-  static inline bool qOCacheItemCompare_Upper(const unsigned& val, const QOCacheItem& it){
+  static inline bool qOCacheItemCompare_Upper(const KInstruction* val, const QOCacheItem& it){
       return val < it.first;
   }
 
@@ -156,7 +158,7 @@ bool CachingSolver::cacheLookup(const Query& query,
       TimerStatIncrementer t(stats::queryOriginTime);
       //get current code position
       if (query.queryOrigin and query.queryOrigin->prevPC){
-          const unsigned codeposition = query.queryOrigin->prevPC->info->id;
+          KInstruction* codeposition = query.queryOrigin->prevPC;
           //lookup query origin cache
           auto qit = std::lower_bound(queryOriginCache.begin(), queryOriginCache.end(), codeposition, qOCacheItemCompare_Lower);
           //search all cache entries for this code position
@@ -194,14 +196,13 @@ void CachingSolver::cacheInsert(const Query& query,
   CacheEntry ce(query.constraints, canonicalQuery);
   IncompleteSolver::PartialValidity cachedResult = 
     (negationUsed ? IncompleteSolver::negatePartialValidity(result) : result);
-
   auto itpair = cache.insert(std::make_pair(ce, cachedResult));
 
   { //QueryOriginCache
       TimerStatIncrementer t(stats::queryOriginTime);
       //get current code position
       if (query.queryOrigin and query.queryOrigin->prevPC){
-          const unsigned codeposition = query.queryOrigin->prevPC->info->id;
+          const KInstruction* codeposition = query.queryOrigin->prevPC;
           auto qit = std::upper_bound(queryOriginCache.begin(), queryOriginCache.end(), codeposition, qOCacheItemCompare_Upper);
           queryOriginCache.insert(qit, std::make_pair(codeposition, &*itpair.first));
       }
