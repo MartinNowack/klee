@@ -61,10 +61,6 @@ private:
       return constraints==b.constraints && *query.get()==*b.query.get();
     }
 
-    bool operator!=(const CacheEntry &b) const {
-          return !(*this == b);
-    }
-
   };
   
   struct CacheEntryHash {
@@ -196,9 +192,9 @@ void CachingSolver::cacheInsert(const Query& query,
   CacheEntry ce(query.constraints, canonicalQuery);
   IncompleteSolver::PartialValidity cachedResult = 
     (negationUsed ? IncompleteSolver::negatePartialValidity(result) : result);
-  auto itpair = cache.insert(std::make_pair(ce, cachedResult));
+  std::pair<cache_map::iterator, bool> itpair = cache.insert(std::make_pair(ce, cachedResult));
 
-  { //QueryOriginCache
+  if (itpair.second){ //QueryOriginCache
       TimerStatIncrementer t(stats::queryOriginTime);
       //get current code position
       if (query.queryOrigin and query.queryOrigin->prevPC){
