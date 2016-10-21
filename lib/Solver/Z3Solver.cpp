@@ -41,6 +41,7 @@ public:
 
   char *getConstraintLog(const Query &);
   void setCoreSolverTimeout(double _timeout) {
+    return;
     assert(_timeout >= 0.0 && "timeout must be >= 0");
     timeout = _timeout;
 
@@ -63,6 +64,21 @@ public:
                        std::vector<std::vector<unsigned char> > *values,
                        bool &hasSolution);
   SolverRunStatus getOperationStatusCode();
+  bool incremental;
+  void setIncrementalStatus(bool enable) {
+    incremental = enable;
+  }
+  bool getIncrementalStatus() {
+    return incremental;
+  }
+
+  void clearSolverStack() {
+    popStack(Z3_solver_get_num_scopes(builder->ctx, theSolver));
+  }
+
+  void popStack(size_t n) {
+    Z3_solver_pop(builder->ctx, theSolver, Z3_solver_get_num_scopes(builder->ctx, theSolver) - n);
+  }
 };
 
 Z3SolverImpl::Z3SolverImpl()
