@@ -98,7 +98,7 @@ void Z3Solver::setCoreSolverTimeout(double timeout) {
 
 char *Z3SolverImpl::getConstraintLog(const Query &query) {
   std::vector<Z3ASTHandle> assumptions;
-  for (std::vector<ref<Expr> >::const_iterator it = query.constraints.begin(),
+  for (auto it = query.constraints.begin(),
                                                ie = query.constraints.end();
        it != ie; ++it) {
     assumptions.push_back(builder->construct(*it));
