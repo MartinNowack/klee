@@ -158,15 +158,14 @@ void STPSolver::setCoreSolverTimeout(double timeout) {
 /***/
 
 char *STPSolverImpl::getConstraintLog(const Query &query) {
-  auto emptyConstraints = query.constraints.empty();
-  if (!emptyConstraints) {
-    vc_push(vc);
-    ++stackIndex;
-    for (ConstraintSetView::const_iterator it = query.constraints.begin(),
-                                           ie = query.constraints.end();
-         it != ie; ++it)
-      vc_assertFormula(vc, builder->construct(*it));
-  }
+  assert(!stackIndex && "getConstraintLog with incremental not support");
+
+  vc_push(vc);
+  ++stackIndex;
+  for (ConstraintSetView::const_iterator it = query.constraints.begin(),
+                                         ie = query.constraints.end();
+       it != ie; ++it)
+    vc_assertFormula(vc, builder->construct(*it));
 
   assert(query.expr == ConstantExpr::alloc(0, Expr::Bool) &&
          "Unexpected expression in query!");
@@ -174,16 +173,11 @@ char *STPSolverImpl::getConstraintLog(const Query &query) {
   char *buffer;
   unsigned long length;
 
-  // New stack level for the query
-  vc_push(vc);
   vc_printQueryStateToBuffer(vc, builder->getFalse(), &buffer, &length, false);
-  vc_pop(vc);
 
-  // Remove added constraints
-  if (!incremental && !emptyConstraints) {
-    vc_pop(vc);
-    --stackIndex;
-  }
+  vc_pop(vc);
+  --stackIndex;
+
   return buffer;
 }
 
