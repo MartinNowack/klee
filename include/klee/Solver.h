@@ -31,7 +31,8 @@ public:
         const ExecutionState *originState)
       : constraints(_constraints), expr(_expr), queryOrigin(originState),
         incremental_flag(false), reused_cntr(0), non_conflicting_cntr(0),
-        added_cntr(0), solver_id(0), solver_state_stack_height(0) {}
+        added_cntr(0), solver_id(0), solver_state_stack_height(0),
+        solver_stack_reduced(0) {}
 
   /// withExpr - Return a copy of the query with the given expression.
   Query withExpr(ref<Expr> _expr) const {
@@ -70,6 +71,8 @@ public:
   /// Stack height
   mutable size_t solver_state_stack_height;
 
+  /// Stack removed
+  mutable size_t solver_stack_reduced;
 
   };
 

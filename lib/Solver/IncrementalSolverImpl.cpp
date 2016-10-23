@@ -654,6 +654,7 @@ Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
     maxStackDepth = solver_max_stack_depth[best_solver];
   }
 
+  auto oldStackHeight = activeSolver->used_expression.size();
   // Remove conflicting levels
   activeSolver->used_expression.erase(activeSolver->used_expression.begin() +
                                           maxStackDepth,
@@ -674,6 +675,7 @@ Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
   q.added_cntr = constraints_to_add.size() /* expr */;
   q.solver_id = activeSolver->solver_id;
   q.solver_state_stack_height = maxStackDepth;
+  q.solver_stack_reduced = oldStackHeight - maxStackDepth;
 
   //  llvm::errs() << "Level: " << maxStackDepth <<
   //      " I:" << !constraints_to_add.empty() << "\n";

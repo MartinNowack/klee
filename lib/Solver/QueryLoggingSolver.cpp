@@ -110,7 +110,7 @@ void QueryLoggingSolver::finishQuery(bool success, const Query & query) {
             << "   AddedConstraints: " << query.added_cntr << "\n";
   logBuffer << queryCommentSign << "   SolverId: " << query.solver_id << "\n";
   logBuffer << queryCommentSign << "   StackDepth: " << query.solver_state_stack_height << "\n";
-
+  logBuffer << queryCommentSign << "   StackRemoved: " << query.solver_stack_reduced << "\n";
 }
 
 void QueryLoggingSolver::flushBuffer() {
