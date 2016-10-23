@@ -30,8 +30,8 @@ public:
   Query(const ConstraintSetView &_constraints, ref<Expr> _expr,
         const ExecutionState *originState)
       : constraints(_constraints), expr(_expr), queryOrigin(originState),
-        incremental_flag(false), reused_cntr(0), query_size(0),
-        added_constraints(0), solver_id(0), solver_state_stack_height(0) {}
+        incremental_flag(false), reused_cntr(0), non_conflicting_cntr(0),
+        added_cntr(0), solver_id(0), solver_state_stack_height(0) {}
 
   /// withExpr - Return a copy of the query with the given expression.
   Query withExpr(ref<Expr> _expr) const {
@@ -59,10 +59,10 @@ public:
   /// This include additional constraints which are not used
   /// in case of incremental solving but still are part of the
   /// solver state.
-  mutable size_t query_size;
+  mutable size_t non_conflicting_cntr;
 
   /// Newly added constraints
-  mutable size_t added_constraints;
+  mutable size_t added_cntr;
 
   /// ID of the solver
   mutable size_t solver_id;

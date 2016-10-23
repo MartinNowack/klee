@@ -454,8 +454,8 @@ Query IncrementalSolverImpl::getPartialQuery_naive_incremental(
 
   // Will use this solver
   // Update statistics and save constraints
-  q.query_size = activeSolver->usedConstraints.size();
-  q.added_constraints = constraints_to_add.size();
+  q.non_conflicting_cntr = activeSolver->usedConstraints.size();
+  q.added_cntr = constraints_to_add.size();
   q.solver_id = activeSolver->solver_id;
 
   if (constraints_to_remove.empty())
@@ -654,21 +654,24 @@ Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
     maxStackDepth = solver_max_stack_depth[best_solver];
   }
 
-  // Clean up previous levels
+  // Remove conflicting levels
   activeSolver->used_expression.erase(activeSolver->used_expression.begin() +
                                           maxStackDepth,
                                       activeSolver->used_expression.end());
   activeSolver->used_positions.erase(activeSolver->used_positions.begin() + maxStackDepth,
       activeSolver->used_positions.end());
 
+  // Update LRU counter
   activeSolver->inactive = 0;
-  // Will use this solver
+
   // Update statistics and save constraints
-  size_t new_size = 0;
+  size_t solver_state_constraint_counter = 0;
   for (auto &i : activeSolver->used_expression)
-    new_size += i.exprs.size();
-  q.query_size = new_size;
-  q.added_constraints = constraints_to_add.size();
+    solver_state_constraint_counter += i.exprs.size();
+
+  q.reused_cntr = solver_positions[best_solver].size();
+  q.non_conflicting_cntr = solver_state_constraint_counter - q.reused_cntr;
+  q.added_cntr = constraints_to_add.size() /* expr */;
   q.solver_id = activeSolver->solver_id;
   q.solver_state_stack_height = maxStackDepth;
 
@@ -691,7 +694,6 @@ Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
   if (maxStackDepth) {
     ++stats::queryIncremental;
     q.incremental_flag = true;
-    q.reused_cntr += (constraints_of_query - constraints_to_add.size());
   }
   auto newQ = Query(activeConstraints, q.expr, q.queryOrigin);
 
@@ -832,8 +834,8 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
     // Will use this solver
     // Update statistics and save constraints
     q.reused_cntr += reuse;
-    q.query_size = activeSolver->usedConstraints.size();
-    q.added_constraints = newlyAddedConstraints.size();
+    q.non_conflicting_cntr = activeSolver->usedConstraints.size();
+    q.added_cntr = newlyAddedConstraints.size();
     q.solver_id = activeSolver->solver_id;
 
     // Clean up previous levels
@@ -933,13 +935,13 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
     }
     activeSolver->stackDepth = 1;
 
-    q.added_constraints = newlyAddedConstraints.size();
+    q.added_cntr = newlyAddedConstraints.size();
     q.solver_id = activeSolver->solver_id;
     activeSolver->inactive = 0;
     activeSolver->solver->impl->popStack(0);
   }
 
-  if (q.constraints.size() != q.added_constraints + q.reused_cntr) {
+  if (q.constraints.size() != q.added_cntr + q.reused_cntr) {
     q.dump();
     assert(0 && "Wrong size");
   }
