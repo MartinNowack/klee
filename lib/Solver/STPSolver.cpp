@@ -423,8 +423,9 @@ bool STPSolverImpl::computePartialInitialValues(
   if (DebugDumpSTPQueries) {
     char *buf;
     unsigned long len;
+    static unsigned counter = 0;
     vc_printQueryStateToBuffer(vc, stp_e, &buf, &len, false);
-    klee_warning("STP query:\n%.*s\n", (unsigned)len, buf);
+    klee_warning("STP query:%u\n%.*s\n", counter++, (unsigned)len, buf);
     free(buf);
   }
 
