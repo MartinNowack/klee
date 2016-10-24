@@ -79,7 +79,9 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Errno.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -378,9 +380,15 @@ Executor::Executor(const InterpreterOptions &opts, InterpreterHandler *ih)
     if (!DebugCompressInstructions) {
 #endif
 
-#if LLVM_VERSION_CODE >= LLVM_VERSION(3, 5)
+#if LLVM_VERSION_CODE >= LLVM_VERSION(3, 6)
+      std::error_code ec;
+      debugInstFile = new llvm::raw_fd_ostream(debug_file_name.c_str(), ec,
+                                               llvm::sys::fs::F_Text);
+      if (ec)
+        ErrorInfo = ec.message();
+#elif LLVM_VERSION_CODE >= LLVM_VERSION(3, 5)
     debugInstFile = new llvm::raw_fd_ostream(debug_file_name.c_str(), ErrorInfo,
-                                             llvm::sys::fs::OpenFlags::F_Text),
+                                             llvm::sys::fs::OpenFlags::F_Text);
 #else
     debugInstFile =
         new llvm::raw_fd_ostream(debug_file_name.c_str(), ErrorInfo);
