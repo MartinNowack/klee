@@ -19,6 +19,13 @@
 #include "klee/ExecutionState.h"
 #include "klee/TimerStatIncrementer.h"
 
+#include "../Core/Executor.h"
+#include "klee/Internal/Module/InstructionInfoTable.h"
+#include "klee/Internal/Module/KInstruction.h"
+#include "klee/Internal/Module/KModule.h"
+
+#include "klee/Internal/Support/ErrorHandling.h"
+
 #include <ciso646>
 
 #ifdef _LIBCPP_VERSION
@@ -32,12 +39,11 @@
 
 namespace klee {
 	class KInstruction;
-}
-
-using namespace klee;
 
 class CachingSolver : public SolverImpl {
 private:
+  const Executor* executor;
+
   ref<Expr> canonicalizeQuery(ref<Expr> originalQuery,
                               bool &negationUsed);
 
@@ -95,7 +101,7 @@ private:
   std::vector<QOCacheItem> queryOriginCache;
 
 public:
-  CachingSolver(Solver *s) : solver(s) {}
+  CachingSolver(Solver *s, const Executor* _executor) : executor(_executor), solver(s){}
   ~CachingSolver() { cache.clear(); delete solver; }
 
   bool computeValidity(const Query&, Solver::Validity &result);
@@ -198,6 +204,11 @@ void CachingSolver::cacheInsert(const Query& query,
       TimerStatIncrementer t(stats::queryOriginTime);
       //get current code position
       if (query.queryOrigin and query.queryOrigin->prevPC){
+          if (queryOriginCache.size() == 0 ){
+            assert(executor != nullptr and executor->kmodule != 0);
+            queryOriginCache.resize(executor->kmodule->infos->getMaxID());
+            llvm::errs() << "Resized QueryOriginCache to " << queryOriginCache.size() << "\n";
+          }
           const KInstruction* codeposition = query.queryOrigin->prevPC;
           auto qit = std::upper_bound(queryOriginCache.begin(), queryOriginCache.end(), codeposition, qOCacheItemCompare_Upper);
           queryOriginCache.insert(qit, std::make_pair(codeposition, &*itpair.first));
@@ -326,7 +337,8 @@ void CachingSolver::setCoreSolverTimeout(double timeout) {
 }
 
 ///
+Solver* createCachingSolver(Solver *_solver, const Executor* executor) {
+  return new Solver(new CachingSolver(_solver, executor));
+}
 
-Solver *klee::createCachingSolver(Solver *_solver) {
-  return new Solver(new CachingSolver(_solver));
 }
