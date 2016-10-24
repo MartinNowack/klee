@@ -131,11 +131,10 @@ public:
   }
 
 protected:
-  Query getPartialQuery(const Query &q);
+  Query getPartialQuery(const Query &q, bool validity);
   Query getPartialQuery_naive_incremental(const Query &q);
 
-  Query getPartialQuery_simple_incremental(const Query &q);
-
+  Query getPartialQuery_simple_incremental(const Query &q, bool validity);
 };
 
 bool isSmaller(const ConstraintPosition &pos1, const ConstraintPosition &pos2) {
@@ -332,7 +331,7 @@ Query IncrementalSolverImpl::getPartialQuery_naive_incremental(
 }
 
 Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
-    const Query &q) {
+    const Query &q, bool validity) {
   SimpleConstraintManager cm(activeConstraints);
   cm.clear();
 
@@ -355,7 +354,7 @@ Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
                                q.constraints.origPosition[iset_cntr].begin(),
                                q.constraints.origPosition[iset_cntr].end());
   }
-  size_t constraints_of_query = constraints_to_add.size();
+//  size_t constraints_of_query = constraints_to_add.size();
 
   // Select best suited solver
   std::vector<std::set<size_t> > solver_positions;
@@ -436,8 +435,11 @@ Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
         break;
       }
 
-      if (abort)
+      if (abort) {
+	// XXX remove me: reset
+//	maxStackDepth = 0;
         break;
+      }
 
       // delete the found expressions
       solver_positions[solver_id].insert(temp_found_expressions.begin(),
@@ -514,7 +516,7 @@ Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
   //  llvm::errs() << "Level: " << maxStackDepth <<
   //      " I:" << !constraints_to_add.empty() << "\n";
 
-  if (!constraints_to_add.empty()) {
+  if (!constraints_to_add.empty() || validity) {
     IndependentElementSet iset;
     for (auto &e : constraints_to_add) {
       iset.add(IndependentElementSet(e));
@@ -524,11 +526,20 @@ Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
     activeSolver->used_positions.push_back(constraint_position);
   }
 
-  // Add expression of the query
-  constraint_position.clear();
-  constraint_position.push_back(ConstraintPosition(0,0,0));
-  activeSolver->used_expression.push_back(IndependentElementSet(q.expr));
-  activeSolver->used_positions.push_back(constraint_position);
+  if (validity) {
+    auto new_e = Expr::createIsZero(q.expr); //NotExpr::alloc(q.expr);
+    activeSolver->used_expression.push_back(IndependentElementSet(new_e));
+    //cm.push_back(new_e);
+    constraint_position.clear();
+    constraint_position.push_back(ConstraintPosition(0,maxStackDepth + 1,0));
+    activeSolver->used_positions.push_back(constraint_position);
+  }
+
+//  // Add expression of the query
+//  constraint_position.clear();
+//  constraint_position.push_back(ConstraintPosition(0,maxStackDepth + 1,0));
+//  activeSolver->used_expression.push_back(IndependentElementSet(q.expr));
+//  activeSolver->used_positions.push_back(constraint_position);
 
   activeSolver->solver->impl->popStack(maxStackDepth);
 
@@ -537,17 +548,17 @@ Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
     ++stats::queryIncremental;
     q.incremental_flag = true;
   }
-  auto newQ = Query(activeConstraints, q.expr, q.queryOrigin);
+  auto newQ = Query(activeConstraints, (validity? Expr::createIsZero(q.expr) :q.expr), q.queryOrigin);
 
-  //  llvm::errs() << "Old query\n";
-  //  q.dump();
-  //
-  //  llvm::errs() << "New query\n";
-  //  newQ.dump();
+    llvm::errs() << "\nOld query\n";
+    q.dump();
+
+    llvm::errs() << "\nNew query\n";
+    newQ.dump();
 
   return newQ;
 }
-Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
+Query IncrementalSolverImpl::getPartialQuery(const Query &q, bool validity) {
 
   TimerStatIncrementer t(stats::queryIncCalculationTime);
   // avoid over approximation, if there aren't any constraints,
@@ -559,32 +570,66 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q) {
 
   if (NaiveIncremental)
     return getPartialQuery_naive_incremental(q);
-  return getPartialQuery_simple_incremental(q);
 
+  return getPartialQuery_simple_incremental(q, validity);
 }
 
 ///
 
 bool IncrementalSolverImpl::computeTruth(const Query &q, bool &isValid) {
-  auto newQuery = getPartialQuery(q);
+  return solvers[0]->impl->computeTruth(q, isValid);
+//  auto newQuery = getPartialQuery(q, false);
+  auto newQuery = getPartialQuery(q, true);
   return activeSolver->solver->impl->computeTruth(newQuery, isValid);
 }
 
 bool IncrementalSolverImpl::computeValidity(const Query &q,
                                             Solver::Validity &result) {
-  auto newQuery = getPartialQuery(q);
-  return activeSolver->solver->impl->computeValidity(newQuery, result);
+
+//  return activeSolver->solver->impl->computeValidity(getPartialQuery(q, false), result);
+
+  // We want to compute validity: p(x) -> q(x) for all x
+  // But we also want to keep the constraints,
+  auto newQuery = getPartialQuery(q, true);
+
+  // we chose the most suitable solver
+
+  // solve validity with conclusion as part of the premise
+  bool isTrue, isFalse;
+
+  // The query p -> q should have the shape: (p,not q) -> F
+  if (!activeSolver->solver->impl->computeTruth(newQuery, isTrue))
+    return false;
+  if (isTrue){
+    result = Solver::True;
+    return true;
+  }
+
+  // Now, either the query is non-sat or unknown
+  // Modify solver instance
+  // XXX optimize me: we already know the right solver instance just update it explicitly
+  auto negatedQuery = getPartialQuery(q.negateExpr(), true);
+  if (!activeSolver->solver->impl->computeTruth(negatedQuery, isFalse))
+    return false;
+
+  result = isFalse ? Solver::False : Solver::Unknown;
+  return true;
 }
 
 bool IncrementalSolverImpl::computeValue(const Query &q, ref<Expr> &result) {
-  auto newQuery = getPartialQuery(q);
+  return solvers[0]->impl->computeValue(q, result);
+
+  auto newQuery = getPartialQuery(q, false);
   return activeSolver->solver->impl->computeValue(newQuery, result);
 }
 
 bool IncrementalSolverImpl::computeInitialValues(
     const Query &query, const std::vector<const Array *> &objects,
     std::vector<std::vector<unsigned char> > &values, bool &hasSolution) {
-  auto newQuery = getPartialQuery(query);
+  // Compute initial value seems to be less effective for incremental solving,
+  // use the static solver
+//  return solvers[0]->impl->computeInitialValues(query, objects, values, hasSolution);
+  auto newQuery = getPartialQuery(query, true);
   return activeSolver->solver->impl->computeInitialValues(newQuery, objects,
                                                           values, hasSolution);
 }

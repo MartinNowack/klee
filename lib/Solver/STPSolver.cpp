@@ -31,7 +31,7 @@ bool IgnoreSolverFailures;
 namespace {
 
 llvm::cl::opt<bool> DebugDumpSTPQueries(
-    "debug-dump-stp-queries", llvm::cl::init(false),
+    "debug-dump-stp-queries", llvm::cl::init(true),
     llvm::cl::desc("Dump every STP query to stderr (default=off)"));
 
 llvm::cl::opt<bool, true> IgnoreSolverFailuresCmd(
@@ -162,6 +162,8 @@ char *STPSolverImpl::getConstraintLog(const Query &query) {
 
   vc_push(vc);
   ++stackIndex;
+//  llvm::errs() << "Push +1\n";
+
   for (ConstraintSetView::const_iterator it = query.constraints.begin(),
                                          ie = query.constraints.end();
        it != ie; ++it)
@@ -177,6 +179,7 @@ char *STPSolverImpl::getConstraintLog(const Query &query) {
 
   vc_pop(vc);
   --stackIndex;
+ // llvm::errs() << "Pop -1\n";
 
   return buffer;
 }
@@ -221,6 +224,7 @@ runAndGetCex(::VC vc, STPBuilder *builder, ::VCExpr q,
              const std::vector<const Array *> &objects,
              std::vector<std::vector<unsigned char> > &values,
              bool &hasSolution) {
+
   // XXX I want to be able to timeout here, safely
   hasSolution = !vc_query(vc, q);
 
@@ -405,15 +409,14 @@ bool STPSolverImpl::computePartialInitialValues(
   ++stats::queries;
   ++stats::queryCounterexamples;
 
-  vc_push(vc);
-  if (!incremental) {
-    for (ConstraintSetView::const_iterator it = query.constraints.begin(),
-                                           ie = query.constraints.end();
-         it != ie; ++it) {
-      vc_assertFormula(vc, builder->construct(*it));
-    }
-  }
-  ExprHandle stp_e = builder->construct(query.expr);
+  if (incremental){
+    vc_push(vc);
+    ++stackIndex;
+//    llvm::errs() << "Push +1\n";
+    vc_assertFormula(vc, builder->construct(query.expr));
+ }
+
+  ExprHandle stp_e = (incremental ? builder->getFalse(): builder->construct(query.expr));
   if (DebugDumpSTPQueries) {
     char *buf;
     unsigned long len;
@@ -439,7 +442,11 @@ bool STPSolverImpl::computePartialInitialValues(
     success = true;
   }
 
-  vc_pop(vc);
+  if (!incremental){
+    vc_pop(vc);
+    --stackIndex;
+//    llvm::errs() << "Pop -1\n";
+  }
 
   if (success) {
     if (hasSolution)
@@ -452,8 +459,10 @@ bool STPSolverImpl::computePartialInitialValues(
 }
 
 void STPSolverImpl::popStack(size_t index) {
+ // llvm::errs() << "Pop from:" << stackIndex << " to:" << index << "\n";
   assert(index <= stackIndex && "Too big");
   for (;stackIndex > index; -- stackIndex) {
+//    llvm::errs() << "Pop -1\n";
     vc_pop(vc);
   }
 }
