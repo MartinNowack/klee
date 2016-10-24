@@ -74,7 +74,7 @@ namespace klee {
   class TimingSolver;
   class TreeStreamWriter;
   template<class T> class ref;
-
+  class CachingSolver;
 
 
   /// \todo Add a context object to keep track of data only live
@@ -89,6 +89,7 @@ class Executor : public Interpreter {
   friend class WeightedRandomSearcher;
   friend class SpecialFunctionHandler;
   friend class StatsTracker;
+  friend class CachingSolver;
 
 public:
   class Timer {

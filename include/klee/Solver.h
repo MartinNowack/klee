@@ -20,6 +20,7 @@ class ConstraintSetView;
 class Expr;
 class SolverImpl;
 class ExecutionState;
+class Executor;
 
 struct Query {
 public:
@@ -340,7 +341,7 @@ public:
   /// memory (without eviction).
   ///
   /// \param s - The underlying solver to use.
-  Solver *createCachingSolver(Solver *s);
+  Solver *createCachingSolver(Solver *s, const Executor* executor);
 
   /// createCexCachingSolver - Create a counterexample caching solver. This is a
   /// more sophisticated cache which records counterexamples for a constraint
