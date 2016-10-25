@@ -258,6 +258,9 @@ void CachingSolver::cacheInsert(const Query& query,
           }
           qit->insert(std::make_pair(ce,itpair.first->second));
       }
+  }else{
+    // possibly improved the solution (e.g. STP-Solution instead of CexCache-Solution)
+    cacheStorage[itpair.first->second] = cachedResult;
   }
 }
 
