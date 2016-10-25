@@ -101,6 +101,10 @@ addons:
     - sourceline: 'ppa:h-rayflood/llvm'
     - sourceline: 'deb http://download.opensuse.org/repositories/home:/delcypher:/z3/xUbuntu_14.04/ /'
       key_url: 'http://download.opensuse.org/repositories/home:delcypher:z3/xUbuntu_14.04/Release.key'
+    - sourceline: 'deb http://llvm.org/apt/trusty/ llvm-toolchain-trusty-3.7 main'
+      key_url: 'http://llvm.org/apt/llvm-snapshot.gpg.key'
+    - sourceline: 'deb http://llvm.org/apt/trusty/ llvm-toolchain-trusty-3.8 main'
+      key_url: 'http://llvm.org/apt/llvm-snapshot.gpg.key'
     packages:
     - gcc-4.8
     - g++-4.8
