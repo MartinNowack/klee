@@ -36,14 +36,83 @@
 #define unordered_map std::tr1::unordered_map
 #endif
 #include <vector>
+#include <memory>
 
 namespace klee {
 	class KInstruction;
 
 class CachingSolver : public SolverImpl {
 private:
+
+  Solver *solver;
+
+  //ORIGIN SOURCE
   const Executor* executor;
 
+  //CACHE
+  struct CacheKey {
+    private:
+      const std::vector<ref<Expr> > constraints;
+      const ref<Expr> query;
+      mutable unsigned hash;
+
+    public:
+      CacheKey(const ConstraintSetView &c, ref<Expr> q)
+        : constraints(c.begin(), c.end()), query(q), hash(0) {}
+
+      CacheKey(const CacheKey &ce)
+        : constraints(ce.constraints), query(ce.query), hash(0) {}
+
+      bool operator==(const CacheKey &b) const {
+        if (hash != 0)
+          return hash==b.get_hash() && constraints==b.constraints && *query.get()==*b.query.get();
+        else
+          return constraints==b.constraints && *query.get()==*b.query.get();
+      }
+
+      const unsigned& get_hash() const{
+        if (hash == 0){
+          hash = query->hash();
+          for (auto it = constraints.begin(); it != constraints.end(); ++it)
+            hash ^= (*it)->hash();
+        }
+        return hash;
+      }
+
+  };
+  
+  struct CacheKeyHash {
+    const unsigned& operator()(const std::shared_ptr<CacheKey> &ce) const {
+      return ce->get_hash();
+    }
+  };
+
+  struct CacheKeyCmp {
+      unsigned operator()(const std::shared_ptr<CacheKey> ce, const std::shared_ptr<CacheKey> oce) const {
+        return (*ce) == (*oce);
+      }
+  };
+
+  typedef std::vector<IncompleteSolver::PartialValidity> CacheStorage;
+  CacheStorage cacheStorage;
+
+  //SIMPLE CACHE
+  typedef unordered_map<const std::shared_ptr<CacheKey>,
+                        const CacheStorage::size_type,
+                        CacheKeyHash,
+                        CacheKeyCmp> SimpleCache;
+
+  SimpleCache cache;
+
+  //QUERY ORIGIN CACHE
+
+  typedef SimpleCache QOCacheItem;
+  typedef std::vector<QOCacheItem*> QOCache;
+
+  QOCache queryOriginCache;
+  QOCache::size_type qoc_size;
+
+private:
   ref<Expr> canonicalizeQuery(ref<Expr> originalQuery,
                               bool &negationUsed);
 
@@ -52,50 +121,9 @@ private:
 
   bool cacheLookup(const Query& query,
                    IncompleteSolver::PartialValidity &result);
-  
-  struct CacheEntry {
-    CacheEntry(const ConstraintSetView &c, ref<Expr> q)
-        : constraints(c.begin(), c.end()), query(q) {}
-
-    CacheEntry(const CacheEntry &ce)
-      : constraints(ce.constraints), query(ce.query) {}
-
-    std::vector<ref<Expr> > constraints;
-    ref<Expr> query;
-
-    bool operator==(const CacheEntry &b) const {
-      return constraints==b.constraints && *query.get()==*b.query.get();
-    }
-
-  };
-  
-  struct CacheEntryHash {
-    unsigned operator()(const CacheEntry &ce) const {
-      unsigned result = ce.query->hash();
-
-      for (auto it = ce.constraints.begin(); it != ce.constraints.end(); ++it)
-        result ^= (*it)->hash();
-      
-      return result;
-    }
-  };
-
-  typedef unordered_map<CacheEntry, 
-                        IncompleteSolver::PartialValidity, 
-                        CacheEntryHash> cache_map;
-  typedef std::pair<const CacheEntry, IncompleteSolver::PartialValidity> CacheItem;
-
-  Solver *solver;
-  cache_map cache;
-
-  typedef std::vector<const CacheItem*> QOCacheItem;
-  typedef std::vector<QOCacheItem*> QOCache;
-
-  QOCache queryOriginCache;
-  QOCache::size_type qoc_size;
 
 public:
-  CachingSolver(Solver *s, const Executor* _executor) : executor(_executor), solver(s), qoc_size(0){}
+  CachingSolver(Solver *s, const Executor* _executor) : solver(s), executor(_executor), qoc_size(0){}
   ~CachingSolver() { cache.clear(); delete solver; }
 
   bool computeValidity(const Query&, Solver::Validity &result);
@@ -148,7 +176,7 @@ bool CachingSolver::cacheLookup(const Query& query,
                                 IncompleteSolver::PartialValidity &result) {
   bool negationUsed;
   ref<Expr> canonicalQuery = canonicalizeQuery(query.expr, negationUsed);
-  const CacheEntry ce(query.constraints, canonicalQuery);
+  const std::shared_ptr<CacheKey> ce = std::make_shared<CacheKey>(query.constraints, canonicalQuery);
 
   { //QueryOriginCache
     TimerStatIncrementer t(stats::queryOriginTime);
@@ -160,30 +188,26 @@ bool CachingSolver::cacheLookup(const Query& query,
             queryOriginCache[query.queryOrigin->prevPC->info->id];
         if ( qit != nullptr ){
           //search all cache entries for this code position
-          for (
-              QOCacheItem::const_iterator qoce = qit->begin();
-              qoce != qit->end();
-              qoce++
-          ){
-            if ((*qoce)->first == ce){
-              ++stats::queryOriginCacheHits;
-              result = (negationUsed ?
-                        IncompleteSolver::negatePartialValidity((*qoce)->second):
-                        (*qoce)->second);
-              return true;
-            }
+          QOCacheItem::const_iterator qocit = qit->find(ce);
+          if (qocit != qit->end()) {
+            ++stats::queryOriginCacheHits;
+            result = (negationUsed ?
+                      IncompleteSolver::negatePartialValidity(cacheStorage[qocit->second]) :
+                      cacheStorage[qocit->second]);
+            return true;
           }
         }
       }
     }
   }
 
-  cache_map::iterator it = cache.find(ce);
+
+  SimpleCache::iterator it = cache.find(ce);
   
   if (it != cache.end()) {
     result = (negationUsed ?
-              IncompleteSolver::negatePartialValidity(it->second) :
-              it->second);
+              IncompleteSolver::negatePartialValidity(cacheStorage[it->second]) :
+              cacheStorage[it->second]);
     return true;
   }
   
@@ -195,34 +219,44 @@ void CachingSolver::cacheInsert(const Query& query,
                                 IncompleteSolver::PartialValidity result) {
   bool negationUsed;
   ref<Expr> canonicalQuery = canonicalizeQuery(query.expr, negationUsed);
+  const std::shared_ptr<CacheKey> ce = std::make_shared<CacheKey>(query.constraints, canonicalQuery);
 
-  CacheEntry ce(query.constraints, canonicalQuery);
   IncompleteSolver::PartialValidity cachedResult = 
     (negationUsed ? IncompleteSolver::negatePartialValidity(result) : result);
-  std::pair<cache_map::iterator, bool> itpair =
-      cache.insert(std::make_pair(ce, cachedResult));
 
-  if (itpair.second){ //QueryOriginCache
+  std::pair<SimpleCache::iterator, bool> itpair =
+      cache.insert(std::make_pair(ce, cacheStorage.size()));
+
+  if (itpair.second){
+      cacheStorage.push_back(cachedResult);
+      //QueryOriginCache
       TimerStatIncrementer t(stats::queryOriginTime);
-      //get current code position
+      //make sure the query origin is accessible
       if (query.queryOrigin and query.queryOrigin->prevPC){
           if (qoc_size == 0){
+            // preallocate the QueryOriginCache to match
+            // the total number of Instructions
             assert(executor != nullptr and executor->kmodule != 0);
             queryOriginCache.resize(
                 executor->kmodule->infos->getMaxID(),
                 nullptr
             );
+            // mark preallocation done for fast access
             qoc_size = queryOriginCache.size();
+            assert(qoc_size != 0 && "QueryOriginCache size should be > 0");
             llvm::errs()
                 << "Resized QueryOriginCache to "
                 << qoc_size << "\n";
           }
-          const QOCache::size_type& codeposition = query.queryOrigin->prevPC->info->id;
-          QOCacheItem* qit = queryOriginCache[codeposition];
-          if (qit == nullptr)
-            queryOriginCache[codeposition] = new QOCacheItem(1, &*itpair.first);
-          else
-            qit->push_back(&*itpair.first);
+          // the instruction-ID is used as the queries origin
+          const QOCache::size_type& codelocation = query.queryOrigin->prevPC->info->id;
+          // we still see a multiple queries from the same code location
+          QOCacheItem* qit = queryOriginCache[codelocation];
+          if (qit == nullptr){ // this code location sees its first query here
+            qit = new QOCacheItem();
+            queryOriginCache[codelocation] = qit;
+          }
+          qit->insert(std::make_pair(ce,itpair.first->second));
       }
   }
 }
