@@ -542,7 +542,7 @@ void Executor::initializeGlobals(ExecutionState &state) {
   // ensures that we won't conflict. we don't need to allocate a memory object
   // since reading/writing via a function pointer is unsupported anyway.
   for (Module::iterator i = m->begin(), ie = m->end(); i != ie; ++i) {
-    Function *f = i;
+    Function *f = &*i;
     ref<ConstantExpr> addr(0);
 
     // If the symbol has external weak linkage then it is implicitly
@@ -627,10 +627,10 @@ void Executor::initializeGlobals(ExecutionState &state) {
 			(int)i->getName().size(), i->getName().data());
       }
 
-      MemoryObject *mo = memory->allocate(size, false, true, i);
+      MemoryObject *mo = memory->allocate(size, false, true, &*i);
       ObjectState *os = bindObjectInState(state, mo, false);
-      globalObjects.insert(std::make_pair(i, mo));
-      globalAddresses.insert(std::make_pair(i, mo->getBaseExpr()));
+      globalObjects.insert(std::make_pair(&*i, mo));
+      globalAddresses.insert(std::make_pair(&*i, mo->getBaseExpr()));
 
       // Program already running = object already initialized.  Read
       // concrete value and write it to our copy.
@@ -655,8 +655,8 @@ void Executor::initializeGlobals(ExecutionState &state) {
       if (!mo)
         llvm::report_fatal_error("out of memory");
       ObjectState *os = bindObjectInState(state, mo, false);
-      globalObjects.insert(std::make_pair(i, mo));
-      globalAddresses.insert(std::make_pair(i, mo->getBaseExpr()));
+      globalObjects.insert(std::make_pair(&*i, mo));
+      globalAddresses.insert(std::make_pair(&*i, mo->getBaseExpr()));
 
       if (!i->hasInitializer())
           os->initializeToRandom();
@@ -667,8 +667,8 @@ void Executor::initializeGlobals(ExecutionState &state) {
   for (Module::alias_iterator i = m->alias_begin(), ie = m->alias_end(); 
        i != ie; ++i) {
     // Map the alias to its aliasee's address. This works because we have
-    // addresses for everything, even undefined functions. 
-    globalAddresses.insert(std::make_pair(i, evalConstant(i->getAliasee())));
+    // addresses for everything, even undefined functions.
+    globalAddresses.insert(std::make_pair(&*i, evalConstant(i->getAliasee())));
   }
 
   // once all objects are allocated, do the actual initialization
@@ -676,7 +676,7 @@ void Executor::initializeGlobals(ExecutionState &state) {
          e = m->global_end();
        i != e; ++i) {
     if (i->hasInitializer()) {
-      MemoryObject *mo = globalObjects.find(i)->second;
+      MemoryObject *mo = globalObjects.find(&*i)->second;
       const ObjectState *os = state.addressSpace.findObject(mo);
       assert(os);
       ObjectState *wos = state.addressSpace.getWriteable(mo, os);
@@ -3559,8 +3559,8 @@ void Executor::runFunctionAsMain(Function *f,
     arguments.push_back(ConstantExpr::alloc(argc, Expr::Int32));
 
     if (++ai!=ae) {
-      argvMO = memory->allocate((argc+1+envc+1+1) * NumPtrBytes, false, true,
-                                f->begin()->begin());
+      argvMO = memory->allocate((argc + 1 + envc + 1 + 1) * NumPtrBytes, false,
+                                true, &*f->begin()->begin());
 
       if (!argvMO)
         klee_error("Could not allocate memory for function arguments");

@@ -134,7 +134,7 @@ InstructionInfoTable::InstructionInfoTable(Module *m)
     // if any.
     const std::string *initialFile = &dummyString;
     unsigned initialLine = 0;
-    for (inst_iterator it = inst_begin(fnIt), ie = inst_end(fnIt); it != ie;
+    for (inst_iterator it = inst_begin(&*fnIt), ie = inst_end(&*fnIt); it != ie;
          ++it) {
       if (getInstructionDebugInfo(&*it, initialFile, initialLine))
         break;
@@ -142,8 +142,8 @@ InstructionInfoTable::InstructionInfoTable(Module *m)
 
     const std::string *file = initialFile;
     unsigned line = initialLine;
-    for (inst_iterator it = inst_begin(fnIt), ie = inst_end(fnIt); it != ie;
-        ++it) {
+    for (inst_iterator it = inst_begin(&*fnIt), ie = inst_end(&*fnIt); it != ie;
+         ++it) {
       Instruction *instr = &*it;
       unsigned assemblyLine = lineTable[instr];
 
@@ -199,6 +199,6 @@ InstructionInfoTable::getFunctionInfo(const Function *f) const {
     // and construct a test case for it if it does, though.
     return dummyInfo;
   } else {
-    return getInfo(f->begin()->begin());
+    return getInfo(&*f->begin()->begin());
   }
 }

@@ -141,7 +141,7 @@ bool IntrinsicCleanerPass::runOnBasicBlock(BasicBlock &b, Module &M) {
       case Intrinsic::uadd_with_overflow:
       case Intrinsic::usub_with_overflow:
       case Intrinsic::umul_with_overflow: {
-        IRBuilder<> builder(ii->getParent(), ii);
+        IRBuilder<> builder(ii->getParent(), i);
 
         Value *op1 = ii->getArgOperand(0);
         Value *op2 = ii->getArgOperand(1);

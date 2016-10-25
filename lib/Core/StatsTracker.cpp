@@ -165,7 +165,7 @@ static bool instructionIsCoverable(Instruction *i) {
     if (it==bb->begin()) {
       return true;
     } else {
-      Instruction *prev = --it;
+      Instruction *prev = &*(--it);
       if (isa<CallInst>(prev) || isa<InvokeInst>(prev)) {
         CallSite cs(prev);
         Function *target = getDirectCallTarget(cs);
@@ -542,7 +542,8 @@ void StatsTracker::writeIStats() {
       // Always try to write the filename before the function name, as otherwise
       // KCachegrind can create two entries for the function, one with an
       // unnamed file and one without.
-      const InstructionInfo &ii = executor.kmodule->infos->getFunctionInfo(fnIt);
+      const InstructionInfo &ii =
+          executor.kmodule->infos->getFunctionInfo(&*fnIt);
       if (ii.file != sourceFile) {
         of << "fl=" << ii.file << "\n";
         sourceFile = ii.file;
@@ -638,9 +639,9 @@ static std::vector<Instruction*> getSuccs(Instruction *i) {
 
   if (i==bb->getTerminator()) {
     for (succ_iterator it = succ_begin(bb), ie = succ_end(bb); it != ie; ++it)
-      res.push_back(it->begin());
+      res.push_back(&*it->begin());
   } else {
-    res.push_back(++BasicBlock::iterator(i));
+    res.push_back(&*(++BasicBlock::iterator(i)));
   }
 
   return res;
@@ -688,18 +689,17 @@ void StatsTracker::computeReachableUncovered() {
         for (BasicBlock::iterator it = bbIt->begin(), ie = bbIt->end(); 
              it != ie; ++it) {
           if (isa<CallInst>(it) || isa<InvokeInst>(it)) {
-            CallSite cs(it);
+            CallSite cs(&*it);
             if (isa<InlineAsm>(cs.getCalledValue())) {
               // We can never call through here so assume no targets
               // (which should be correct anyhow).
-              callTargets.insert(std::make_pair(it,
-                                                std::vector<Function*>()));
+              callTargets.insert(
+                  std::make_pair(&*it, std::vector<Function *>()));
             } else if (Function *target = getDirectCallTarget(cs)) {
-              callTargets[it].push_back(target);
+              callTargets[&*it].push_back(target);
             } else {
-              callTargets[it] = 
-                std::vector<Function*>(km->escapingFunctions.begin(),
-                                       km->escapingFunctions.end());
+              callTargets[&*it] = std::vector<Function *>(
+                  km->escapingFunctions.begin(), km->escapingFunctions.end());
             }
           }
         }
@@ -720,12 +720,12 @@ void StatsTracker::computeReachableUncovered() {
          fnIt != fn_ie; ++fnIt) {
       if (fnIt->isDeclaration()) {
         if (fnIt->doesNotReturn()) {
-          functionShortestPath[fnIt] = 0;
+          functionShortestPath[&*fnIt] = 0;
         } else {
-          functionShortestPath[fnIt] = 1; // whatever
+          functionShortestPath[&*fnIt] = 1; // whatever
         }
       } else {
-        functionShortestPath[fnIt] = 0;
+        functionShortestPath[&*fnIt] = 0;
       }
 
       // Not sure if I should bother to preorder here. XXX I should.
@@ -733,8 +733,8 @@ void StatsTracker::computeReachableUncovered() {
            bbIt != bb_ie; ++bbIt) {
         for (BasicBlock::iterator it = bbIt->begin(), ie = bbIt->end(); 
              it != ie; ++it) {
-          instructions.push_back(it);
-          unsigned id = infos.getInfo(it).id;
+          instructions.push_back(&*it);
+          unsigned id = infos.getInfo(&*it).id;
           sm.setIndexedValue(stats::minDistToReturn, 
                              id, 
                              isa<ReturnInst>(it)
@@ -815,7 +815,7 @@ void StatsTracker::computeReachableUncovered() {
          bbIt != bb_ie; ++bbIt) {
       for (BasicBlock::iterator it = bbIt->begin(), ie = bbIt->end(); 
            it != ie; ++it) {
-        unsigned id = infos.getInfo(it).id;
+        unsigned id = infos.getInfo(&*it).id;
         instructions.push_back(&*it);
         sm.setIndexedValue(stats::minDistToUncovered, 
                            id, 
