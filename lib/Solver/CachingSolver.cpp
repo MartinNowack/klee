@@ -240,42 +240,38 @@ void CachingSolver::cacheInsert(const Query& query,
     std::pair<SimpleCache::iterator, bool> itpair =
         cache.insert(std::make_pair(ce, cacheStorage.size()));
 
-    if (itpair.second){
-        cacheStorage.push_back(cachedResult);
-        //QueryOriginCache
-        TimerStatIncrementer t(stats::queryOriginTime);
-        //make sure the query origin is accessible
-        if (query.queryOrigin and query.queryOrigin->prevPC){
-            if (qoc_size == 0){
-              // preallocate the QueryOriginCache to match
-              // the total number of Instructions
-              assert(executor != nullptr and executor->kmodule != 0);
-              queryOriginCache.resize(
-                  executor->kmodule->infos->getMaxID(),
-                  nullptr
-              );
-              // mark preallocation done for fast access
-              qoc_size = queryOriginCache.size();
-              assert(qoc_size != 0 && "QueryOriginCache size should be > 0");
-              llvm::errs()
-                  << "Resized QueryOriginCache to "
-                  << qoc_size << "\n";
-            }
-            // the instruction-ID is used as the queries origin
-            const QOCache::size_type& codelocation =
-                query.queryOrigin->prevPC->info->id;
-            // we still see a multiple queries from the same code location
-            QOCacheItem* qit = queryOriginCache[codelocation];
-            if (qit == nullptr){ // this code location sees its first query here
-              qit = new QOCacheItem();
-              queryOriginCache[codelocation] = qit;
-            }
-            qit->insert(std::make_pair(ce,itpair.first->second));
+    assert(itpair.second && "with cacheHitAt == 0 we assume the cache entry not to be in the cache yet!");
+
+    cacheStorage.push_back(cachedResult);
+    //QueryOriginCache
+    TimerStatIncrementer t(stats::queryOriginTime);
+    //make sure the query origin is accessible
+    if (query.queryOrigin and query.queryOrigin->prevPC){
+        if (qoc_size == 0){
+          // preallocate the QueryOriginCache to match
+          // the total number of Instructions
+          assert(executor != nullptr and executor->kmodule != 0);
+          queryOriginCache.resize(
+              executor->kmodule->infos->getMaxID(),
+              nullptr
+          );
+          // mark preallocation done for fast access
+          qoc_size = queryOriginCache.size();
+          assert(qoc_size != 0 && "QueryOriginCache size should be > 0");
+          llvm::errs()
+              << "Resized QueryOriginCache to "
+              << qoc_size << "\n";
         }
-    }else{
-      // possibly improved the solution (e.g. STP-Solution instead of CexCache-Solution)
-      cacheStorage[itpair.first->second] = cachedResult;
-      ++stats::queryOriginCacheReplace;
+        // the instruction-ID is used as the queries origin
+        const QOCache::size_type& codelocation =
+            query.queryOrigin->prevPC->info->id;
+        // we still see a multiple queries from the same code location
+        QOCacheItem* qit = queryOriginCache[codelocation];
+        if (qit == nullptr){ // this code location sees its first query here
+          qit = new QOCacheItem();
+          queryOriginCache[codelocation] = qit;
+        }
+        qit->insert(std::make_pair(ce,itpair.first->second));
     }
   }
 }
