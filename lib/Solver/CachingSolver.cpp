@@ -117,13 +117,17 @@ private:
                               bool &negationUsed);
 
   void cacheInsert(const Query& query,
-                   IncompleteSolver::PartialValidity result);
+                   IncompleteSolver::PartialValidity result,
+                   CacheStorage::size_type cacheHitAt);
 
-  bool cacheLookup(const Query& query,
+  CacheStorage::size_type cacheLookup(const Query& query,
                    IncompleteSolver::PartialValidity &result);
 
 public:
-  CachingSolver(Solver *s, const Executor* _executor) : solver(s), executor(_executor), qoc_size(0){}
+  CachingSolver(Solver *s, const Executor* _executor) : solver(s), executor(_executor), qoc_size(0){
+    // insert sentinel cache entry at index 0 meaning cache miss
+    cacheStorage.push_back(IncompleteSolver::PartialValidity::None);
+  }
   ~CachingSolver() { cache.clear(); delete solver; }
 
   bool computeValidity(const Query&, Solver::Validity &result);
@@ -172,7 +176,7 @@ ref<Expr> CachingSolver::canonicalizeQuery(ref<Expr> originalQuery,
 
 /** @returns true on a cache hit, false of a cache miss.  Reference
     value result only valid on a cache hit. */
-bool CachingSolver::cacheLookup(const Query& query,
+CachingSolver::CacheStorage::size_type CachingSolver::cacheLookup(const Query& query,
                                 IncompleteSolver::PartialValidity &result) {
   bool negationUsed;
   ref<Expr> canonicalQuery = canonicalizeQuery(query.expr, negationUsed);
@@ -194,7 +198,7 @@ bool CachingSolver::cacheLookup(const Query& query,
             result = (negationUsed ?
                       IncompleteSolver::negatePartialValidity(cacheStorage[qocit->second]) :
                       cacheStorage[qocit->second]);
-            return true;
+            return qocit->second;
           }
         }
       }
@@ -208,66 +212,79 @@ bool CachingSolver::cacheLookup(const Query& query,
     result = (negationUsed ?
               IncompleteSolver::negatePartialValidity(cacheStorage[it->second]) :
               cacheStorage[it->second]);
-    return true;
+    return it->second;
   }
   
-  return false;
+  return 0;
 }
 
 /// Inserts the given query, result pair into the cache.
 void CachingSolver::cacheInsert(const Query& query,
-                                IncompleteSolver::PartialValidity result) {
+                                IncompleteSolver::PartialValidity result,
+                                CacheStorage::size_type cacheHitAt) {
   bool negationUsed;
   ref<Expr> canonicalQuery = canonicalizeQuery(query.expr, negationUsed);
-  const std::shared_ptr<CacheKey> ce = std::make_shared<CacheKey>(query.constraints, canonicalQuery);
 
   IncompleteSolver::PartialValidity cachedResult = 
     (negationUsed ? IncompleteSolver::negatePartialValidity(result) : result);
 
-  std::pair<SimpleCache::iterator, bool> itpair =
-      cache.insert(std::make_pair(ce, cacheStorage.size()));
-
-  if (itpair.second){
-      cacheStorage.push_back(cachedResult);
-      //QueryOriginCache
-      TimerStatIncrementer t(stats::queryOriginTime);
-      //make sure the query origin is accessible
-      if (query.queryOrigin and query.queryOrigin->prevPC){
-          if (qoc_size == 0){
-            // preallocate the QueryOriginCache to match
-            // the total number of Instructions
-            assert(executor != nullptr and executor->kmodule != 0);
-            queryOriginCache.resize(
-                executor->kmodule->infos->getMaxID(),
-                nullptr
-            );
-            // mark preallocation done for fast access
-            qoc_size = queryOriginCache.size();
-            assert(qoc_size != 0 && "QueryOriginCache size should be > 0");
-            llvm::errs()
-                << "Resized QueryOriginCache to "
-                << qoc_size << "\n";
-          }
-          // the instruction-ID is used as the queries origin
-          const QOCache::size_type& codelocation = query.queryOrigin->prevPC->info->id;
-          // we still see a multiple queries from the same code location
-          QOCacheItem* qit = queryOriginCache[codelocation];
-          if (qit == nullptr){ // this code location sees its first query here
-            qit = new QOCacheItem();
-            queryOriginCache[codelocation] = qit;
-          }
-          qit->insert(std::make_pair(ce,itpair.first->second));
-      }
-  }else{
+  // cacheHitAt index 0 means "miss" (see sentinel cache entry in constructor
+  if (cacheHitAt > 0){
     // possibly improved the solution (e.g. STP-Solution instead of CexCache-Solution)
-    cacheStorage[itpair.first->second] = cachedResult;
+    cacheStorage[cacheHitAt] = cachedResult; // no nead to touch the caches here!
+    ++stats::queryOriginCacheReplace;
+  }else{
+    const std::shared_ptr<CacheKey> ce =
+        std::make_shared<CacheKey>(query.constraints, canonicalQuery);
+
+    std::pair<SimpleCache::iterator, bool> itpair =
+        cache.insert(std::make_pair(ce, cacheStorage.size()));
+
+    if (itpair.second){
+        cacheStorage.push_back(cachedResult);
+        //QueryOriginCache
+        TimerStatIncrementer t(stats::queryOriginTime);
+        //make sure the query origin is accessible
+        if (query.queryOrigin and query.queryOrigin->prevPC){
+            if (qoc_size == 0){
+              // preallocate the QueryOriginCache to match
+              // the total number of Instructions
+              assert(executor != nullptr and executor->kmodule != 0);
+              queryOriginCache.resize(
+                  executor->kmodule->infos->getMaxID(),
+                  nullptr
+              );
+              // mark preallocation done for fast access
+              qoc_size = queryOriginCache.size();
+              assert(qoc_size != 0 && "QueryOriginCache size should be > 0");
+              llvm::errs()
+                  << "Resized QueryOriginCache to "
+                  << qoc_size << "\n";
+            }
+            // the instruction-ID is used as the queries origin
+            const QOCache::size_type& codelocation =
+                query.queryOrigin->prevPC->info->id;
+            // we still see a multiple queries from the same code location
+            QOCacheItem* qit = queryOriginCache[codelocation];
+            if (qit == nullptr){ // this code location sees its first query here
+              qit = new QOCacheItem();
+              queryOriginCache[codelocation] = qit;
+            }
+            qit->insert(std::make_pair(ce,itpair.first->second));
+        }
+    }else{
+      // possibly improved the solution (e.g. STP-Solution instead of CexCache-Solution)
+      cacheStorage[itpair.first->second] = cachedResult;
+      ++stats::queryOriginCacheReplace;
+    }
   }
 }
 
 bool CachingSolver::computeValidity(const Query& query,
                                     Solver::Validity &result) {
   IncompleteSolver::PartialValidity cachedResult;
-  bool tmp, cacheHit = cacheLookup(query, cachedResult);
+  CacheStorage::size_type cacheHitAt = cacheLookup(query, cachedResult);
+  bool cacheHit = cacheHitAt > 0;
   
   if (cacheHit) {
     switch(cachedResult) {
@@ -285,30 +302,28 @@ bool CachingSolver::computeValidity(const Query& query,
       return true;
     case IncompleteSolver::MayBeTrue: {
       ++stats::queryCacheMisses;
-      if (!solver->impl->computeTruth(query, tmp))
+      if (!solver->impl->computeTruth(query, cacheHit))
         return false;
-      ++stats::queryOriginCacheReplace;
-      if (tmp) {
-        cacheInsert(query, IncompleteSolver::MustBeTrue);
+      if (cacheHit) {
+        cacheInsert(query, IncompleteSolver::MustBeTrue, cacheHitAt);
         result = Solver::True;
         return true;
       } else {
-        cacheInsert(query, IncompleteSolver::TrueOrFalse);
+        cacheInsert(query, IncompleteSolver::TrueOrFalse, cacheHitAt);
         result = Solver::Unknown;
         return true;
       }
     }
     case IncompleteSolver::MayBeFalse: {
       ++stats::queryCacheMisses;
-      if (!solver->impl->computeTruth(query.negateExpr(), tmp))
+      if (!solver->impl->computeTruth(query.negateExpr(), cacheHit))
         return false;
-      ++stats::queryOriginCacheReplace;
-      if (tmp) {
-        cacheInsert(query, IncompleteSolver::MustBeFalse);
+      if (cacheHit) {
+        cacheInsert(query, IncompleteSolver::MustBeFalse, cacheHitAt);
         result = Solver::False;
         return true;
       } else {
-        cacheInsert(query, IncompleteSolver::TrueOrFalse);
+        cacheInsert(query, IncompleteSolver::TrueOrFalse, cacheHitAt);
         result = Solver::Unknown;
         return true;
       }
@@ -331,14 +346,15 @@ bool CachingSolver::computeValidity(const Query& query,
     cachedResult = IncompleteSolver::TrueOrFalse; break;
   }
   
-  cacheInsert(query, cachedResult);
+  cacheInsert(query, cachedResult, cacheHitAt);
   return true;
 }
 
 bool CachingSolver::computeTruth(const Query& query,
                                  bool &isValid) {
   IncompleteSolver::PartialValidity cachedResult;
-  bool cacheHit = cacheLookup(query, cachedResult);
+  CacheStorage::size_type cacheHitAt = cacheLookup(query, cachedResult);
+  bool cacheHit = cacheHitAt > 0;
 
   // a cached result of MayBeTrue forces us to check whether
   // a False assignment exists.
@@ -365,10 +381,7 @@ bool CachingSolver::computeTruth(const Query& query,
     cachedResult = IncompleteSolver::MayBeFalse;
   }
   
-  if (cacheHit)
-      ++stats::queryOriginCacheReplace;
-
-  cacheInsert(query, cachedResult);
+  cacheInsert(query, cachedResult, cacheHitAt);
   return true;
 }
 
