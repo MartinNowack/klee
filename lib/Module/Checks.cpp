@@ -71,6 +71,8 @@ bool DivCheckPass::runOnModule(Module &M) {
                                           false,  /* sign doesn't matter */
                                           "int_cast_to_i64",
                                           i);
+            denominator->setDebugLoc(binOp->getDebugLoc());
+
             
             // Lazily bind the function to avoid always importing it.
             if (!divZeroCheckFunction) {
@@ -127,6 +129,7 @@ bool OvershiftCheckPass::runOnModule(Module &M) {
                                           false,  /* sign doesn't matter */
                                           "int_cast_to_i64",
                                           i);
+            shift->setDebugLoc(binOp->getDebugLoc());
             args.push_back(shift);
 
 
