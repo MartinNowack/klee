@@ -73,7 +73,8 @@ namespace {
     
   cl::opt<bool>
   NoTruncateSourceLines("no-truncate-source-lines",
-                        cl::desc("Don't truncate long lines in the output source"));
+                        cl::desc("Don't truncate long lines in the output source"),
+                        cl::init(true));
 
   cl::opt<bool>
   OutputSource("output-source",
