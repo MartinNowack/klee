@@ -1569,9 +1569,16 @@ Function* Executor::getTargetFunction(Value *calledVal, ExecutionState &state) {
   }
 }
 
-/// TODO remove?
 static bool isDebugIntrinsic(const Function *f, KModule *KM) {
-  return false;
+  if (!f->isIntrinsic())
+    return false;
+  switch (f->getIntrinsicID()){
+  case Intrinsic::dbg_value:
+  case Intrinsic::dbg_declare:
+    return true;
+  default:
+    return false;
+  }
 }
 
 static inline const llvm::fltSemantics * fpWidthToSemantics(unsigned width) {
