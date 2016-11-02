@@ -128,7 +128,18 @@ public:
     // insert sentinel cache entry at index 0 meaning cache miss
     cacheStorage.push_back(IncompleteSolver::PartialValidity::None);
   }
-  ~CachingSolver() { cache.clear(); delete solver; }
+  ~CachingSolver() {
+    for(auto it=queryOriginCache.begin(); it != queryOriginCache.end(); it++){
+      if(*it){
+        (*it)->clear();
+        delete (*it);
+      }
+    }
+    queryOriginCache.clear();
+    cache.clear();
+    cacheStorage.clear();
+    delete solver;
+  }
 
   bool computeValidity(const Query&, Solver::Validity &result);
   bool computeTruth(const Query&, bool &isValid);
