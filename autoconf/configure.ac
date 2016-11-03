@@ -486,10 +486,10 @@ dnl User option to select runtime version
 
 AC_ARG_WITH(runtime,
   AS_HELP_STRING([--with-runtime],
-    [Select build configuration for runtime libraries (default [Release+Asserts])]),,
+    [Select build configuration for runtime libraries (default [Release+Debug+Asserts])]),,
     withval=default)
 if test X"${withval}" = Xdefault; then
-   with_runtime=Release+Asserts
+   with_runtime=Release+Debug+Asserts
 fi
 
 AC_MSG_CHECKING([runtime configuration])
@@ -511,6 +511,11 @@ elif test X${with_runtime} = XDebug; then
 elif test X${with_runtime} = XDebug+Asserts; then
    AC_MSG_RESULT([Debug+Asserts])
    AC_SUBST(RUNTIME_ENABLE_OPTIMIZED,[[0]])
+   AC_SUBST(RUNTIME_DISABLE_ASSERTIONS,[[0]])
+   AC_SUBST(RUNTIME_DEBUG_SYMBOLS,[[1]])
+elif test X${with_runtime} = XRelease+Debug+Asserts; then
+   AC_MSG_RESULT([Release+Debug+Assets])
+   AC_SUBST(RUNTIME_ENABLE_OPTIMIZED,[[1]])
    AC_SUBST(RUNTIME_DISABLE_ASSERTIONS,[[0]])
    AC_SUBST(RUNTIME_DEBUG_SYMBOLS,[[1]])
 else
