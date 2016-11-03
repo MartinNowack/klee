@@ -1395,7 +1395,7 @@ Optional Packages:
   --with-uclibc           Enable use of the klee uclibc at the given path
                           (klee-uclibc root directory or libc.a file
   --with-runtime          Select build configuration for runtime libraries
-                          (default [Release+Asserts])
+                          (default [Release+Debug+Asserts])
   --without-tcmalloc      Ignore presence of tcmalloc and disable it
                           (default=detect)
   --without-zlib          Ignore presence of zlib and disable it
@@ -4119,7 +4119,7 @@ else
 fi
 
 if test X"${withval}" = Xdefault; then
-   with_runtime=Release+Asserts
+   with_runtime=Release+Debug+Asserts
 fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking runtime configuration" >&5
@@ -4155,6 +4155,15 @@ elif test X${with_runtime} = XDebug+Asserts; then
    { $as_echo "$as_me:${as_lineno-$LINENO}: result: Debug+Asserts" >&5
 $as_echo "Debug+Asserts" >&6; }
    RUNTIME_ENABLE_OPTIMIZED=0
+
+   RUNTIME_DISABLE_ASSERTIONS=0
+
+   RUNTIME_DEBUG_SYMBOLS=1
+
+elif test X${with_runtime} = XRelease+Debug+Asserts; then
+   { $as_echo "$as_me:${as_lineno-$LINENO}: result: Release+Debug+Assets" >&5
+$as_echo "Release+Debug+Assets" >&6; }
+   RUNTIME_ENABLE_OPTIMIZED=1
 
    RUNTIME_DISABLE_ASSERTIONS=0
 
