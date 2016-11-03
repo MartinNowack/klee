@@ -79,8 +79,4 @@ endif
 # disable unwind test
 TEST_FEATURE_LIST += no-unwind
 
-CFLAGS := @CFLAGS@ -Wall -g
-CXXFLAGS := @CXXFLAGS@ -g -Wall
-LDFLAGS := @LDFLAGS@ -g
-
 REQUIRES_RTTI := @REQUIRES_RTTI@
