@@ -136,6 +136,22 @@ void klee::klee_error(const char *msg, ...) {
   exit(1);
 }
 
+void klee::klee_error(const std::string &message) {
+  klee_error("%s", message.c_str());
+}
+
+void klee::klee_error(enum ErrorCode code, const char *msg, ...) {
+  va_list ap;
+  va_start(ap, msg);
+  klee_vmessage(errorPrefix, false, msg, ap);
+  va_end(ap);
+  exit(code);
+}
+
+void klee::klee_error(enum ErrorCode code, std::string &message) {
+  klee_error(code, "%s", message.c_str());
+}
+
 void klee::klee_warning(const char *msg, ...) {
   va_list ap;
   va_start(ap, msg);

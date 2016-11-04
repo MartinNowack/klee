@@ -103,10 +103,12 @@ MemoryManager::MemoryManager(ArrayCache *_arrayCache)
                      MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 
     if (newSpace == MAP_FAILED) {
-      klee_error("Couldn't mmap() memory for deterministic allocations");
+      klee_error(MemoryManagement,
+                 "Couldn't mmap() memory for deterministic allocations");
     }
     if (expectedAddress != newSpace && expectedAddress != 0) {
-      klee_error("Could not allocate memory deterministically");
+      klee_error(MemoryManagement,
+                 "Could not allocate memory deterministically");
     }
 
     klee_message("Deterministic memory allocation starting from %p", newSpace);
@@ -193,7 +195,7 @@ MemoryObject *MemoryManager::allocateFixed(uint64_t address, uint64_t size,
        ++it) {
     MemoryObject *mo = *it;
     if (address + size > mo->address && address < mo->address + mo->size)
-      klee_error("Trying to allocate an overlapping object");
+      klee_error(MemoryManagement, "Trying to allocate an overlapping object");
   }
 #endif
 

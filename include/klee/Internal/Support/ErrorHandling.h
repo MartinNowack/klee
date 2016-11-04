@@ -17,6 +17,7 @@
 #endif
 
 #include <stdio.h>
+#include <string>
 
 namespace klee {
 
@@ -27,6 +28,24 @@ extern FILE *klee_message_file;
 /// newline on stderr and to warnings.txt, then exit with an error.
 void klee_error(const char *msg, ...)
     __attribute__((format(printf, 1, 2), noreturn));
+
+void klee_error(const std::string &message) __attribute__((noreturn));
+
+enum ErrorCode {
+  OK = 0,
+  Internal = 1,
+  NotSupported = 2,
+  MemoryManagement = 3, // Issues of memory management not part of the runtime
+  Runtime = 4,          // General runtime issues
+  RuntimeMemory = 5,
+  RuntimeFileDescriptor = 6,
+  RuntimeSolver = 7,
+  RuntimeCache = 8,
+  RuntimeCouldNotTerminate = 9
+};
+void klee_error(ErrorCode code, const char *msg, ...)
+    __attribute__((format(printf, 2, 3), noreturn));
+void klee_error(ErrorCode code, std::string &message) __attribute__((noreturn));
 
 /// Print "KLEE: " followed by the msg in printf format and a
 /// newline on stderr and to messages.txt.

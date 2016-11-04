@@ -243,7 +243,7 @@ bool CexCachingSolver::getAssignment(const Query& query, Assignment *&result) {
       if (!binding->satisfies(key.begin(), key.end())) {
         query.dump();
         binding->dump();
-        klee_error("Generated assignment doesn't match query");
+        klee_error(RuntimeCache, "Generated assignment doesn't match query");
       }
   } else {
     binding = (Assignment*) 0;
