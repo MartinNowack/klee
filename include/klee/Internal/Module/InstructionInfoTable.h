@@ -26,7 +26,8 @@
 namespace llvm {
   class Function;
   class Instruction;
-  class Module; 
+  class Module;
+  class LLVMContext;
 }
 
 namespace klee {
@@ -36,18 +37,14 @@ namespace klee {
     unsigned id;
     const std::string &file;
     unsigned line;
+    unsigned column;
     unsigned assemblyLine;
 
   public:
-    InstructionInfo(unsigned _id,
-                    const std::string &_file,
-                    unsigned _line,
-                    unsigned _assemblyLine)
-      : id(_id), 
-        file(_file),
-        line(_line),
-        assemblyLine(_assemblyLine) {
-    }
+    InstructionInfo(unsigned _id, const std::string &_file, unsigned _line,
+                    unsigned _column, unsigned _assemblyLine)
+        : id(_id), file(_file), line(_line), column(_column),
+          assemblyLine(_assemblyLine) {}
   };
 
   class InstructionInfoTable {
@@ -60,12 +57,14 @@ namespace klee {
     std::string dummyString;
     InstructionInfo dummyInfo;
     unordered_map<const llvm::Instruction *, InstructionInfo> infos;
+    unordered_map<const llvm::Function *, InstructionInfo> functionInfos;
     std::set<const std::string *, ltstr> internedStrings;
 
   private:
     const std::string *internString(std::string s);
-    bool getInstructionDebugInfo(const llvm::Instruction *I,
-                                 const std::string *&File, unsigned &Line);
+    bool getInstructionDebugInfo(llvm::Instruction *I, const std::string *&File,
+                                 unsigned &Line, unsigned &Column,
+                                 llvm::LLVMContext &context);
 
   public:
     InstructionInfoTable(llvm::Module *m);
