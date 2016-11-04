@@ -689,7 +689,8 @@ void Executor::initializeGlobals(ExecutionState &state) {
       uint64_t size = kmodule->targetData->getTypeStoreSize(ty);
       MemoryObject *mo = memory->allocate(size, false, true, &*i);
       if (!mo)
-        llvm::report_fatal_error("out of memory");
+        klee_error(MemoryManagement,
+                   "Out of memory. Could not allocate memory object.");
       ObjectState *os = bindObjectInState(state, mo, false);
       globalObjects.insert(std::make_pair(i, mo));
       globalAddresses.insert(std::make_pair(i, mo->getBaseExpr()));
@@ -1037,7 +1038,7 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
 void Executor::addConstraint(ExecutionState &state, ref<Expr> condition) {
   if (ConstantExpr *CE = dyn_cast<ConstantExpr>(condition)) {
     if (!CE->isTrue())
-      llvm::report_fatal_error("attempt to add invalid constraint");
+      klee_error("attempt to add invalid constraint");
     return;
   }
 
@@ -1124,7 +1125,7 @@ ref<klee::ConstantExpr> Executor::evalConstant(const Constant *c) {
       return cast<ConstantExpr>(res);
     } else {
       // Constant{Vector}
-      llvm::report_fatal_error("invalid argument to evalConstant()");
+      klee_error("invalid argument to evalConstant()");
     }
   }
 }
@@ -1379,7 +1380,7 @@ void Executor::executeCall(ExecutionState &state,
       // FIXME: It would be nice to check for errors in the usage of this as
       // well.
     default:
-      klee_error("unknown intrinsic: %s", f->getName().data());
+      klee_error(NotSupported, "unknown intrinsic: %s", f->getName().data());
     }
 
     if (InvokeInst *ii = dyn_cast<InvokeInst>(i))
@@ -1547,8 +1548,8 @@ Function* Executor::getTargetFunction(Value *calledVal, ExecutionState &state) {
         GlobalValue *old_gv = gv;
         gv = currModule->getNamedValue(alias);
         if (!gv) {
-          klee_error("Function %s(), alias for %s not found!\n", alias.c_str(),
-                     old_gv->getName().str().c_str());
+          klee_error(Runtime, "Function %s(), alias for %s not found!\n",
+                     alias.c_str(), old_gv->getName().str().c_str());
         }
       }
      

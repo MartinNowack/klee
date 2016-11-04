@@ -9,6 +9,7 @@
 
 #include "klee/Internal/Module/InstructionInfoTable.h"
 #include "klee/Config/Version.h"
+#include "klee/Internal/Support/ErrorHandling.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
 #include "llvm/IR/Function.h"
@@ -178,8 +179,7 @@ InstructionInfoTable::getInfo(const Instruction *inst) const {
   unordered_map<const llvm::Instruction *, InstructionInfo>::const_iterator it =
       infos.find(inst);
   if (it == infos.end())
-    llvm::report_fatal_error("invalid instruction, not present in "
-                             "initial module!");
+    klee_error("invalid instruction, not present in initial module!");
   return it->second;
 }
 

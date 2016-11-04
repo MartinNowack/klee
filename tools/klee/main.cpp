@@ -421,8 +421,7 @@ void KleeHandler::processTestCase(const ExecutionState &state,
                                   const char *errorMessage,
                                   const char *errorSuffix) {
   if (errorMessage && ExitOnError) {
-    llvm::errs() << "EXITING ON ERROR:\n" << errorMessage << "\n";
-    exit(1);
+    klee_error("EXITING ON ERROR:\n%s\n", errorMessage);
   }
 
   if (!NoOutput) {
@@ -579,9 +578,8 @@ void KleeHandler::getKTestFilesInDir(std::string directoryPath,
   }
 
   if (ec) {
-    llvm::errs() << "ERROR: unable to read output directory: " << directoryPath
-                 << ": " << ec.message() << "\n";
-    exit(1);
+    klee_error("ERROR: unable to read output directory: " + directoryPath +
+               ": " + ec.message() + "\n");
   }
 }
 
@@ -1197,8 +1195,8 @@ int main(int argc, char **argv, char **envp) {
           if (errno==ECHILD) { // No child, no need to watch but
                                // return error since we didn't catch
                                // the exit.
-            klee_warning("KLEE: watchdog exiting (no child)\n");
-            return 1;
+                               klee_error(
+                                   "KLEE: watchdog exiting (no child)\n");
           } else if (errno!=EINTR) {
             perror("watchdog waitpid");
             exit(1);
@@ -1223,7 +1221,7 @@ int main(int argc, char **argv, char **envp) {
               klee_warning(
                   "KLEE: WATCHDOG: kill(9)ing child (I tried to be nice)\n");
               kill(pid, SIGKILL);
-              return 1; // what more can we do
+              return RuntimeCouldNotTerminate; // what more can we do
             }
 
             // Ideally this triggers a dump, which may take a while,

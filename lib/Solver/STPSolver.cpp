@@ -108,10 +108,10 @@ STPSolverImpl::STPSolverImpl(bool _useForkedSTP, bool _optimizeDivides)
     shared_memory_id =
         shmget(IPC_PRIVATE, shared_memory_size, IPC_CREAT | 0700);
     if (shared_memory_id < 0)
-      llvm::report_fatal_error("unable to allocate shared memory region");
+      klee_error("unable to allocate shared memory region");
     shared_memory_ptr = (unsigned char *)shmat(shared_memory_id, NULL, 0);
     if (shared_memory_ptr == (void *)-1)
-      llvm::report_fatal_error("unable to attach shared memory region");
+      klee_error("unable to attach shared memory region");
     shmctl(shared_memory_id, IPC_RMID, NULL);
   }
 }
@@ -226,15 +226,17 @@ runAndGetCexForked(::VC vc, STPBuilder *builder, ::VCExpr q,
        it != ie; ++it)
     sum += (*it)->size;
   if (sum >= shared_memory_size)
-    llvm::report_fatal_error("not enough shared memory for counterexample");
+    klee_error(RuntimeSolver, "not enough shared memory for counterexample");
 
   fflush(stdout);
   fflush(stderr);
   int pid = fork();
   if (pid == -1) {
-    klee_warning("fork failed (for STP) - %s", llvm::sys::StrError(errno).c_str());
-    if (!IgnoreSolverFailures)
-      exit(1);
+    if (IgnoreSolverFailures)
+      klee_warning("fork failed (for STP) - %s", llvm::sys::StrError(errno).c_str());
+    else
+      klee_error(RuntimeSolver, "fork failed (for STP) - %s", llvm::sys::StrError(errno).c_str());
+
     return SolverImpl::SOLVER_RUN_STATUS_FORK_FAILED;
   }
 
@@ -267,9 +269,11 @@ runAndGetCexForked(::VC vc, STPBuilder *builder, ::VCExpr q,
     } while (res < 0 && errno == EINTR);
 
     if (res < 0) {
-      klee_warning("waitpid() for STP failed");
-      if (!IgnoreSolverFailures)
-        exit(1);
+      if (IgnoreSolverFailures)
+        klee_warning("waitpid() for STP failed");
+      else
+        klee_error(RuntimeSolver, "waitpid() for STP failed");
+
       return SolverImpl::SOLVER_RUN_STATUS_WAITPID_FAILED;
     }
 
@@ -277,11 +281,14 @@ runAndGetCexForked(::VC vc, STPBuilder *builder, ::VCExpr q,
     // "occasion" return a status when the process was terminated by a
     // signal, so test signal first.
     if (WIFSIGNALED(status) || !WIFEXITED(status)) {
-      klee_warning("STP did not return successfully.  Most likely you forgot "
+      if (IgnoreSolverFailures)
+        klee_warning("STP did not return successfully.  Most likely you forgot "
+                     "to run 'ulimit -s unlimited'");
+      else
+        klee_error(RuntimeSolver,
+                   "STP did not return successfully.  Most likely you forgot "
                    "to run 'ulimit -s unlimited'");
-      if (!IgnoreSolverFailures) {
-        exit(1);
-      }
+
       return SolverImpl::SOLVER_RUN_STATUS_INTERRUPTED;
     }
 
@@ -295,9 +302,11 @@ runAndGetCexForked(::VC vc, STPBuilder *builder, ::VCExpr q,
       // mark that a timeout occurred
       return SolverImpl::SOLVER_RUN_STATUS_TIMEOUT;
     } else {
-      klee_warning("STP did not return a recognized code");
-      if (!IgnoreSolverFailures)
-        exit(1);
+      if (IgnoreSolverFailures)
+        klee_warning("STP did not return a recognized code");
+      else
+        klee_error(RuntimeSolver, "STP did not return a recognized code");
+
       return SolverImpl::SOLVER_RUN_STATUS_UNEXPECTED_EXIT_CODE;
     }
 
