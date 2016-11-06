@@ -2913,6 +2913,9 @@ void Executor::run(ExecutionState &initialState) {
     updateStates(&state);
   }
 
+  // print statistics before cleaning up
+  statsTracker->done();
+
   delete searcher;
   searcher = 0;
 
