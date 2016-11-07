@@ -221,6 +221,11 @@ namespace {
   Watchdog("watchdog",
            cl::desc("Use a watchdog process to enforce --max-time."),
            cl::init(0));
+
+  cl::opt<bool> Coredump(
+      "coredump",
+      cl::desc("Generate coredump of KLEE if it is killed after timeout."),
+      cl::init(false));
 }
 
 extern cl::opt<double> MaxTime;
@@ -1218,7 +1223,10 @@ int main(int argc, char **argv, char **envp) {
             } else {
               klee_warning(
                   "KLEE: WATCHDOG: kill(9)ing child (I tried to be nice)\n");
-              kill(pid, SIGKILL);
+              if (Coredump)
+                kill(pid, SIGABRT);
+              else
+                kill(pid, SIGKILL);
               return RuntimeCouldNotTerminate; // what more can we do
             }
 
