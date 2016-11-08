@@ -96,17 +96,11 @@ private:
   typedef std::vector<IncompleteSolver::PartialValidity> CacheStorage;
   CacheStorage cacheStorage;
 
-  //SIMPLE CACHE
+  //QUERY ORIGIN CACHE
   typedef unordered_map<const std::shared_ptr<CacheKey>,
                         const CacheStorage::size_type,
                         CacheKeyHash,
-                        CacheKeyCmp> SimpleCache;
-
-  SimpleCache cache;
-
-  //QUERY ORIGIN CACHE
-
-  typedef SimpleCache QOCacheItem;
+                        CacheKeyCmp> QOCacheItem;
   typedef std::vector<QOCacheItem*> QOCache;
 
   QOCache queryOriginCache;
@@ -136,7 +130,6 @@ public:
       }
     }
     queryOriginCache.clear();
-    cache.clear();
     cacheStorage.clear();
     delete solver;
   }
@@ -215,17 +208,6 @@ CachingSolver::CacheStorage::size_type CachingSolver::cacheLookup(const Query& q
       }
     }
   }
-
-
-  SimpleCache::iterator it = cache.find(ce);
-  
-  if (it != cache.end()) {
-    result = (negationUsed ?
-              IncompleteSolver::negatePartialValidity(cacheStorage[it->second]) :
-              cacheStorage[it->second]);
-    return it->second;
-  }
-  
   return 0;
 }
 
@@ -248,12 +230,6 @@ void CachingSolver::cacheInsert(const Query& query,
     const std::shared_ptr<CacheKey> ce =
         std::make_shared<CacheKey>(query.constraints, canonicalQuery);
 
-    std::pair<SimpleCache::iterator, bool> itpair =
-        cache.insert(std::make_pair(ce, cacheStorage.size()));
-
-    assert(itpair.second && "with cacheHitAt == 0 we assume the cache entry not to be in the cache yet!");
-
-    cacheStorage.push_back(cachedResult);
     //QueryOriginCache
     TimerStatIncrementer t(stats::queryOriginTime);
     //make sure the query origin is accessible
@@ -282,7 +258,8 @@ void CachingSolver::cacheInsert(const Query& query,
           qit = new QOCacheItem();
           queryOriginCache[codelocation] = qit;
         }
-        qit->insert(std::make_pair(ce,itpair.first->second));
+        qit->insert(std::make_pair(ce,cacheStorage.size())); //This is not thread-safe!
+        cacheStorage.push_back(cachedResult);
     }
   }
 }
