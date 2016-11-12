@@ -434,6 +434,7 @@ void StatsTracker::writeStatsHeader() {
 #endif
 	     << "'CacheHits',"
 	     << "'CacheMisses',"
+	     << "'ExprCntr',"
              << ")\n";
   statsFile->flush();
 }
@@ -466,6 +467,7 @@ void StatsTracker::writeStatsLine() {
 #endif
 	     << "," << stats::queryCacheHits
 	     << "," << stats::queryCacheMisses
+	     << "," << Expr::count
              << ")\n";
   statsFile->flush();
 }
