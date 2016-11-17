@@ -332,6 +332,10 @@ namespace {
       cl::desc("Terminates a state after the limit of stack frames is reached "
                "(default=8192). Disable check with 0."),
       cl::init(8192));
+
+  llvm::cl::opt<std::string> InstructionValidationFile(
+      "instruction-validation-file",
+      llvm::cl::desc("Use file to validate executed instructions against it."));
 }
 
 
@@ -358,13 +362,14 @@ Executor::Executor(const InterpreterOptions &opts, InterpreterHandler *ih)
     : Interpreter(opts), kmodule(0), interpreterHandler(ih), searcher(0),
       externalDispatcher(new ExternalDispatcher()), statsTracker(0),
       pathWriter(0), symPathWriter(0), specialFunctionHandler(0),
-      processTree(0), replayKTest(0), replayPath(0), usingSeeds(0),
-      atMemoryLimit(false), inhibitForking(false), haltExecution(false),
-      ivcEnabled(false),
+      processTree(0), replayKTest(0), replayPath(0), replayPosition(0),
+      usingSeeds(0), atMemoryLimit(false), inhibitForking(false),
+      haltExecution(false), ivcEnabled(false),
       coreSolverTimeout(MaxCoreSolverTime != 0 && MaxInstructionTime != 0
                             ? std::min(MaxCoreSolverTime, MaxInstructionTime)
                             : std::max(MaxCoreSolverTime, MaxInstructionTime)),
-      debugInstFile(0), debugLogBuffer(debugBufferString), stackTrackFile(0) {
+      debugInstFile(0), debugLogBuffer(debugBufferString), stackTrackFile(0),
+      validationFile(0) {
 
   if (coreSolverTimeout) UseForkedCoreSolver = true;
   Solver *coreSolver = klee::createCoreSolver(CoreSolverToUse);
@@ -443,6 +448,10 @@ Executor::Executor(const InterpreterOptions &opts, InterpreterHandler *ih)
                  "be forked.");
     }
   }
+
+  if (!InstructionValidationFile.empty()) {
+    initializeValidationFile(InstructionValidationFile);
+  }
 }
 
 
@@ -498,6 +507,9 @@ Executor::~Executor() {
 
   if (stackTrackFile)
     delete stackTrackFile;
+
+  if (validationFile)
+    delete validationFile;
 }
 
 /***/
@@ -1302,6 +1314,7 @@ void Executor::printDebugInstructions(ExecutionState &state) {
 
 void Executor::stepInstruction(ExecutionState &state) {
   printDebugInstructions(state);
+  checkInstructions(state);
   if (statsTracker)
     statsTracker->stepInstruction(state);
 
