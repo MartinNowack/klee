@@ -25,10 +25,11 @@
 
 #include "llvm/ADT/Twine.h"
 
-#include <vector>
-#include <string>
+#include <istream>
 #include <map>
 #include <set>
+#include <string>
+#include <vector>
 
 struct KTest;
 
@@ -211,6 +212,8 @@ private:
   llvm::raw_string_ostream debugLogBuffer;
 
   llvm::raw_ostream *stackTrackFile;
+
+  std::istream *validationFile;
 
   llvm::Function* getTargetFunction(llvm::Value *calledVal,
                                     ExecutionState &state);
@@ -433,6 +436,8 @@ private:
                      double maxInstTime);
   void checkMemoryUsage();
   void printDebugInstructions(ExecutionState &state);
+  void initializeValidationFile(std::string &name);
+  void checkInstructions(ExecutionState &state);
   void doDumpStates();
 
 public:
