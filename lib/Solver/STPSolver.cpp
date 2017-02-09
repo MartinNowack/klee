@@ -402,7 +402,7 @@ bool STPSolverImpl::computePartialInitialValues(
     vc_push(vc);
     ++stackIndex;
 
-    for (ConstraintManager::const_iterator it = query.constraints.begin(),
+    for (ConstraintSetView::const_iterator it = query.constraints.begin(),
                                            ie = query.constraints.end();
          it != ie; ++it) {
       vc_assertFormula(vc, builder->construct(*it));
@@ -413,7 +413,7 @@ bool STPSolverImpl::computePartialInitialValues(
 
   vc_push(vc);
   if (!incremental) {
-    for (ConstraintManager::const_iterator it = query.constraints.begin(),
+    for (ConstraintSetView::const_iterator it = query.constraints.begin(),
                                            ie = query.constraints.end();
          it != ie; ++it) {
       vc_assertFormula(vc, builder->construct(*it));

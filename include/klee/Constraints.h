@@ -14,7 +14,6 @@
 #include <cstdint>
 #include <iterator>
 #include <type_traits>
-#include <unordered_map>
 #include <vector>
 
 #include "klee/Expr.h"
