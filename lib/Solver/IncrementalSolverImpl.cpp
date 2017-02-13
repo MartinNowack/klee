@@ -299,9 +299,6 @@ Query IncrementalSolverImpl::getPartialQuery_naive_incremental(
                                           maxStackDepth,
                                       activeSolver->used_expression.end());
 
-  //  llvm::errs() << "Level: " << maxStackDepth <<
-  //      " I:" << !constraints_to_add.empty() << "\n";
-
   if (!constraints_to_add.empty()) {
     IndependentElementSet iset;
     for (auto &e : constraints_to_add) {
@@ -319,15 +316,7 @@ Query IncrementalSolverImpl::getPartialQuery_naive_incremental(
     q.incremental_flag = true;
     q.reused_cntr += (reused - constraints_to_add.size());
   }
-  auto newQ = Query(activeConstraints, q.expr, q.queryOrigin);
-
-  //  llvm::errs() << "Old query\n";
-  //  q.dump();
-  //
-  //  llvm::errs() << "New query\n";
-  //  newQ.dump();
-
-  return newQ;
+  return Query(activeConstraints, q.expr, q.queryOrigin);
 }
 
 Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
@@ -354,7 +343,6 @@ Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
                                q.constraints.origPosition[iset_cntr].begin(),
                                q.constraints.origPosition[iset_cntr].end());
   }
-//  size_t constraints_of_query = constraints_to_add.size();
 
   // Select best suited solver
   std::vector<std::set<size_t> > solver_positions;
@@ -367,22 +355,19 @@ Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
   for (size_t solver_id = 1; solver_id < active_solvers; ++solver_id) {
     // Simple, we just check how many constraints we have in common and remove
     // the uncommon ones.
-    //
     // Each stack frame of the solver is equivalent to one independent set for
     // it
     size_t maxStackDepth = 0;
     solver_positions.push_back(std::set<size_t>());
-    //    std::set<size_t> positions;
 
     SolvingState *currentSolver = &active_incremental_solvers[solver_id];
     currentSolver->inactive++;
-
     max_inactive =
         (currentSolver->inactive > max_inactive ? currentSolver->inactive
                                                 : max_inactive);
 
     for (auto &iset : currentSolver->used_expression) {
-      // Check if this iset intersects with the query. In that case, we can
+      // Check if this iset does not intersect with the query. In that case, we can
       // ignore it.
       bool iset_query_intersection = iset.intersects(query_iset);
       bool iset_expr_intersection = expr_iset.intersects(iset);
@@ -513,10 +498,7 @@ Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
   q.solver_state_stack_height = maxStackDepth;
   q.solver_stack_reduced = oldStackHeight - maxStackDepth;
 
-  //  llvm::errs() << "Level: " << maxStackDepth <<
-  //      " I:" << !constraints_to_add.empty() << "\n";
-
-  if (!constraints_to_add.empty() || validity) {
+  if (!constraints_to_add.empty()) {
     IndependentElementSet iset;
     for (auto &e : constraints_to_add) {
       iset.add(IndependentElementSet(e));
@@ -526,40 +508,30 @@ Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
     activeSolver->used_positions.push_back(constraint_position);
   }
 
-  if (validity) {
-    auto new_e = Expr::createIsZero(q.expr); //NotExpr::alloc(q.expr);
-    activeSolver->used_expression.push_back(IndependentElementSet(new_e));
-    //cm.push_back(new_e);
-    constraint_position.clear();
-    constraint_position.push_back(ConstraintPosition(0,maxStackDepth + 1,0));
-    activeSolver->used_positions.push_back(constraint_position);
-  }
-
-//  // Add expression of the query
-//  constraint_position.clear();
-//  constraint_position.push_back(ConstraintPosition(0,maxStackDepth + 1,0));
-//  activeSolver->used_expression.push_back(IndependentElementSet(q.expr));
-//  activeSolver->used_positions.push_back(constraint_position);
+//  if (validity) {
+//    auto new_e = Expr::createIsZero(q.expr); //NotExpr::alloc(q.expr);
+//    activeSolver->used_expression.push_back(IndependentElementSet(new_e));
+//    //cm.push_back(new_e);
+//    constraint_position.clear();
+//    constraint_position.push_back(ConstraintPosition(0,maxStackDepth + 1,0));
+//    activeSolver->used_positions.push_back(constraint_position);
+//  }
 
   activeSolver->solver->impl->popStack(maxStackDepth);
 
-  // We found one existing solver, update stats
+  // We found one existing solver, update statistics
   if (maxStackDepth) {
     ++stats::queryIncremental;
     q.incremental_flag = true;
   }
-  auto newQ = Query(activeConstraints, (validity? Expr::createIsZero(q.expr) :q.expr), q.queryOrigin);
 
-    llvm::errs() << "\nOld query\n";
-    q.dump();
 
-    llvm::errs() << "\nNew query\n";
-    newQ.dump();
+  auto newQ = Query(activeConstraints, q.expr, q.queryOrigin);
+
 
   return newQ;
 }
 Query IncrementalSolverImpl::getPartialQuery(const Query &q, bool validity) {
-
   TimerStatIncrementer t(stats::queryIncCalculationTime);
   // avoid over approximation, if there aren't any constraints,
   // we can't save anything
@@ -577,7 +549,7 @@ Query IncrementalSolverImpl::getPartialQuery(const Query &q, bool validity) {
 ///
 
 bool IncrementalSolverImpl::computeTruth(const Query &q, bool &isValid) {
-  return solvers[0]->impl->computeTruth(q, isValid);
+//  return solvers[0]->impl->computeTruth(q, isValid);
 //  auto newQuery = getPartialQuery(q, false);
   auto newQuery = getPartialQuery(q, true);
   return activeSolver->solver->impl->computeTruth(newQuery, isValid);
@@ -617,7 +589,7 @@ bool IncrementalSolverImpl::computeValidity(const Query &q,
 }
 
 bool IncrementalSolverImpl::computeValue(const Query &q, ref<Expr> &result) {
-  return solvers[0]->impl->computeValue(q, result);
+//  return solvers[0]->impl->computeValue(q, result);
 
   auto newQuery = getPartialQuery(q, false);
   return activeSolver->solver->impl->computeValue(newQuery, result);
@@ -651,7 +623,8 @@ void IncrementalSolverImpl::setCoreSolverTimeout(double timeout) {
 ///
 
 IncrementalSolver::IncrementalSolver(Solver *solver)
-    : Solver(new IncrementalSolverImpl(solver)) {}
+    : Solver(new IncrementalSolverImpl(solver)) {
+}
 
 char *IncrementalSolver::getConstraintLog(const Query &q) {
   return impl->getConstraintLog(q);

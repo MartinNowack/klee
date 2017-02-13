@@ -31,7 +31,7 @@ bool IgnoreSolverFailures;
 namespace {
 
 llvm::cl::opt<bool> DebugDumpSTPQueries(
-    "debug-dump-stp-queries", llvm::cl::init(true),
+    "debug-dump-stp-queries", llvm::cl::init(false),
     llvm::cl::desc("Dump every STP query to stderr (default=off)"));
 
 llvm::cl::opt<bool, true> IgnoreSolverFailuresCmd(
@@ -162,7 +162,6 @@ char *STPSolverImpl::getConstraintLog(const Query &query) {
 
   vc_push(vc);
   ++stackIndex;
-//  llvm::errs() << "Push +1\n";
 
   for (ConstraintSetView::const_iterator it = query.constraints.begin(),
                                          ie = query.constraints.end();
@@ -179,7 +178,6 @@ char *STPSolverImpl::getConstraintLog(const Query &query) {
 
   vc_pop(vc);
   --stackIndex;
- // llvm::errs() << "Pop -1\n";
 
   return buffer;
 }
@@ -201,19 +199,19 @@ bool STPSolverImpl::computeValue(const Query &query, ref<Expr> &result) {
   std::vector<std::vector<unsigned char> > values;
   bool hasSolution;
 
-  // Find the object used in the expression, and compute an assignment
+  // Find the symbolic objects used in the expression, and compute an assignment
   // for them.
   findSymbolicObjects(query.expr, objects);
   if (!computeInitialValues(query.withFalse(), objects, values, hasSolution))
     return false;
+
   assert(hasSolution && "state has invalid constraint set");
 
   // Evaluate the expression with the computed assignment.
   Assignment a(objects, values);
   // We just compute any value, therefore the expression can be either true or
-  // false
-  // force concretization to acquire one possible outcome
-  // Currently we assume that computeValue generates a constant
+  // false. Force concretization to acquire one possible outcome.
+  // Currently we assume that computeValue generates a constant.
   result = a.evaluate(query.expr, true /* concretize symbolics */);
 
   return true;
@@ -392,42 +390,30 @@ bool STPSolverImpl::computePartialInitialValues(
     const Query &query, const std::vector<const Array *> &objects,
     std::vector<std::vector<unsigned char> > &values, bool &hasSolution) {
   runStatusCode = SOLVER_RUN_STATUS_FAILURE;
-
   TimerStatIncrementer t(stats::queryTime);
 
   bool emptyConstraints = query.constraints.empty();
-  if (incremental && !emptyConstraints) {
+  if (!emptyConstraints) {
     vc_push(vc);
     ++stackIndex;
-
     for (ConstraintSetView::const_iterator it = query.constraints.begin(),
                                            ie = query.constraints.end();
          it != ie; ++it) {
       vc_assertFormula(vc, builder->construct(*it));
     }
   }
+
   ++stats::queries;
   ++stats::queryCounterexamples;
 
-  if (incremental){
-    vc_push(vc);
-    ++stackIndex;
-//    llvm::errs() << "Push +1\n";
-    vc_assertFormula(vc, builder->construct(query.expr));
- }
-
-  ExprHandle stp_e = (incremental ? builder->getFalse(): builder->construct(query.expr));
+  ExprHandle stp_e = builder->construct(query.expr); //(incremental ? builder->getFalse(): builder->construct(query.expr));
   if (DebugDumpSTPQueries) {
     char *buf;
     unsigned long len;
     static unsigned counter = 0;
     vc_printQueryStateToBuffer(vc, stp_e, &buf, &len, false);
-    klee_warning("STP query:%u\n%.*s\n", counter++, (unsigned)len, buf);
+    klee_warning("STP query:%u %u\n%.*s\n", counter++, stackIndex, (unsigned)len, buf);
     free(buf);
-  }
-  if (incremental){
-    vc_push(vc);
-    ++stackIndex;
   }
 
   bool success;
@@ -442,10 +428,9 @@ bool STPSolverImpl::computePartialInitialValues(
     success = true;
   }
 
-  if (!incremental){
+  if (!incremental && !emptyConstraints){
     vc_pop(vc);
     --stackIndex;
-//    llvm::errs() << "Pop -1\n";
   }
 
   if (success) {
@@ -459,10 +444,8 @@ bool STPSolverImpl::computePartialInitialValues(
 }
 
 void STPSolverImpl::popStack(size_t index) {
- // llvm::errs() << "Pop from:" << stackIndex << " to:" << index << "\n";
   assert(index <= stackIndex && "Too big");
   for (;stackIndex > index; -- stackIndex) {
-//    llvm::errs() << "Pop -1\n";
     vc_pop(vc);
   }
 }
