@@ -89,8 +89,8 @@ Z3SolverImpl::Z3SolverImpl()
   Z3_params_inc_ref(builder->ctx, solverParameters);
   timeoutParamStrSymbol = Z3_mk_string_symbol(builder->ctx, "timeout");
   setCoreSolverTimeout(timeout);
-  ::Z3_tactic qf_aufbv_tactic = Z3_mk_tactic(builder->ctx, "qfaufbv");
-  theSolver = Z3_mk_solver_from_tactic(builder->ctx, qf_aufbv_tactic);
+  ::Z3_symbol logic_str = Z3_mk_string_symbol(builder->ctx, "QF_AUFBV");
+  theSolver = Z3_mk_solver_for_logic(builder->ctx, logic_str);
   Z3_solver_inc_ref(builder->ctx, theSolver);
   Z3_solver_set_params(builder->ctx, theSolver, solverParameters);
 
