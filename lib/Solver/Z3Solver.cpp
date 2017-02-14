@@ -65,6 +65,7 @@ public:
                        bool &hasSolution);
   SolverRunStatus getOperationStatusCode();
   bool incremental;
+  size_t inc_index;
   void setIncrementalStatus(bool enable) {
     incremental = enable;
   }
@@ -73,17 +74,20 @@ public:
   }
 
   void clearSolverStack() {
-    popStack(Z3_solver_get_num_scopes(builder->ctx, theSolver));
+    builder->clearConstructCache();
+    popStack(0);
   }
 
-  void popStack(size_t n) {
-    Z3_solver_pop(builder->ctx, theSolver, Z3_solver_get_num_scopes(builder->ctx, theSolver) - n);
+  void popStack(size_t until_index) {
+    assert(until_index <= inc_index);
+    Z3_solver_pop(builder->ctx, theSolver, inc_index - until_index);
+    inc_index = until_index;
   }
 };
 
 Z3SolverImpl::Z3SolverImpl()
     : builder(new Z3Builder(/*autoClearConstructCache=*/false)), timeout(0.0),
-      runStatusCode(SOLVER_RUN_STATUS_FAILURE) {
+      runStatusCode(SOLVER_RUN_STATUS_FAILURE), inc_index(0) {
   assert(builder && "unable to create Z3Builder");
   solverParameters = Z3_mk_params(builder->ctx);
   Z3_params_inc_ref(builder->ctx, solverParameters);
@@ -114,8 +118,7 @@ void Z3Solver::setCoreSolverTimeout(double timeout) {
 
 char *Z3SolverImpl::getConstraintLog(const Query &query) {
   std::vector<Z3ASTHandle> assumptions;
-  for (auto it = query.constraints.begin(),
-                                               ie = query.constraints.end();
+  for (auto it = query.constraints.begin(), ie = query.constraints.end();
        it != ie; ++it) {
     assumptions.push_back(builder->construct(*it));
   }
@@ -193,9 +196,18 @@ bool Z3SolverImpl::internalRunSolver(
   // impact vs making one global solver and using push and pop?
   // TODO: is the "simple_solver" the right solver to use for
   // best performance?
-  Z3_solver_reset(builder->ctx, theSolver);
+  if (!incremental) {
+    Z3_solver_reset(builder->ctx, theSolver);
+    inc_index = 0;
+    assert(Z3_solver_get_num_scopes(builder->ctx, theSolver) == 0);
+  }
 
   runStatusCode = SOLVER_RUN_STATUS_FAILURE;
+
+  if (incremental && !query.constraints.empty()) {
+    Z3_solver_push(builder->ctx, theSolver);
+    ++inc_index;
+  }
 
   for (ConstraintSetView::const_iterator it = query.constraints.begin(),
                                          ie = query.constraints.end();
@@ -209,6 +221,11 @@ bool Z3SolverImpl::internalRunSolver(
   Z3ASTHandle z3QueryExpr =
       Z3ASTHandle(builder->construct(query.expr), builder->ctx);
 
+  // Open a new context  for the implication
+  if (incremental) {
+    Z3_solver_push(builder->ctx, theSolver);
+    ++inc_index;
+  }
   // KLEE Queries are validity queries i.e.
   // ∀ X Constraints(X) → query(X)
   // but Z3 works in terms of satisfiability so instead we ask the
@@ -221,13 +238,19 @@ bool Z3SolverImpl::internalRunSolver(
   ::Z3_lbool satisfiable = Z3_solver_check(builder->ctx, theSolver);
   runStatusCode = handleSolverResponse(theSolver, satisfiable, objects, values,
                                        hasSolution);
+  if (incremental) {
+    // Remove context for implication
+    Z3_solver_pop(builder->ctx, theSolver, 1);
+    --inc_index;
+  }
 
   // Clear the builder's cache to prevent memory usage exploding.
   // By using ``autoClearConstructCache=false`` and clearing now
   // we allow Z3_ast expressions to be shared from an entire
   // ``Query`` rather than only sharing within a single call to
   // ``builder->construct()``.
-  builder->clearConstructCache();
+  if (!incremental)
+    builder->clearConstructCache();
 
   if (runStatusCode == SolverImpl::SOLVER_RUN_STATUS_SUCCESS_SOLVABLE ||
       runStatusCode == SolverImpl::SOLVER_RUN_STATUS_SUCCESS_UNSOLVABLE) {
