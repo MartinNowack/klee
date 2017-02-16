@@ -32,7 +32,11 @@ private:
   size_t spaceSize;
 
 public:
-  MemoryManager(ArrayCache *arrayCache);
+  /**
+   * \param deterministicAlloc Allow allocation of deterministic memory
+   * XXX This is just a workaround to avoid mmap memory a second time.
+   */
+  MemoryManager(ArrayCache *arrayCache, bool deterministicAlloc);
   ~MemoryManager();
 
   /**

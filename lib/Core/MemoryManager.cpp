@@ -93,10 +93,10 @@ llvm::cl::opt<unsigned long long> DeterministicStartAddress(
 }
 
 /***/
-MemoryManager::MemoryManager(ArrayCache *_arrayCache)
+MemoryManager::MemoryManager(ArrayCache *_arrayCache, bool determMemory)
     : arrayCache(_arrayCache), deterministicSpace(0), nextFreeSlot(0),
       spaceSize(DeterministicAllocationSize.getValue() * 1024 * 1024) {
-  if (DeterministicAllocation) {
+  if (DeterministicAllocation && determMemory) {
     // Page boundary
     void *expectedAddress = (void *)DeterministicStartAddress.getValue();
 
@@ -128,7 +128,7 @@ MemoryManager::~MemoryManager() {
     delete mo;
   }
 
-  if (DeterministicAllocation)
+  if (DeterministicAllocation && deterministicSpace)
     munmap(deterministicSpace, spaceSize);
 }
 

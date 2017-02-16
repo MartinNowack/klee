@@ -385,7 +385,7 @@ Executor::Executor(const InterpreterOptions &opts, InterpreterHandler *ih)
       interpreterHandler->getOutputFilename(SOLVER_QUERIES_KQUERY_FILE_NAME));
 
   this->solver = new TimingSolver(solver, EqualitySubstitution);
-  memory = new MemoryManager(&arrayCache);
+  memory = new MemoryManager(&arrayCache, true);
 
   if (DebugPrintInstructions &&
       (DebugPrintInstructions & 0x1) == 1) { // Check if write to a file
@@ -3738,7 +3738,7 @@ void Executor::runFunctionAsMain(Function *f,
 
   // hack to clear memory objects
   delete memory;
-  memory = new MemoryManager(NULL);
+  memory = new MemoryManager(NULL, false);
 
   globalObjects.clear();
   globalAddresses.clear();
