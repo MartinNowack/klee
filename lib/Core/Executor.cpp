@@ -1755,7 +1755,6 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     ref<Expr> cond = eval(ki, 0, state).value;
     BasicBlock *bb = si->getParent();
 
-    cond = toUnique(state, cond);
     if (ConstantExpr *CE = dyn_cast<ConstantExpr>(cond)) {
       // Somewhat gross to create these all the time, but fine till we
       // switch to an internal rep.
