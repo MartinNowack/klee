@@ -17,7 +17,11 @@
 #include "klee/util/ExprUtil.h"
 
 #include "llvm/Support/ErrorHandling.h"
-
+namespace {
+llvm::cl::opt<bool> DebugDumpZ3Queries(
+    "debug-dump-z3-queries", llvm::cl::init(false),
+    llvm::cl::desc("Dump every Z3 query to stderr (default=off)"));
+}
 namespace klee {
 
 class Z3SolverImpl : public SolverImpl {
@@ -34,6 +38,7 @@ private:
                          const std::vector<const Array *> *objects,
                          std::vector<std::vector<unsigned char> > *values,
                          bool &hasSolution);
+  void printZ3Query();
 
 public:
   Z3SolverImpl();
@@ -79,6 +84,11 @@ public:
   }
 
   void popStack(size_t until_index) {
+    if (until_index == 0) {
+      Z3_solver_reset(builder->ctx, theSolver);
+      inc_index = 0;
+      return;
+    }
     assert(until_index <= inc_index);
     Z3_solver_pop(builder->ctx, theSolver, inc_index - until_index);
     inc_index = until_index;
@@ -188,15 +198,27 @@ bool Z3SolverImpl::computeInitialValues(
   return internalRunSolver(query, &objects, &values, hasSolution);
 }
 
+void Z3SolverImpl::printZ3Query() {
+  if (!DebugDumpZ3Queries)
+    return;
+  static size_t query_id = 0;
+  llvm::errs() << "\nQuery\n" << query_id++ << "\n";
+  ::Z3_ast_vector svector = Z3_solver_get_assertions(builder->ctx, theSolver);
+  for (size_t i = 0, j = Z3_ast_vector_size(builder->ctx, svector); i < j;
+       ++i) {
+    llvm::errs() << Z3_ast_to_string(
+                        builder->ctx,
+                        Z3_ast_vector_get(builder->ctx, svector, i))
+                 << "\n";
+  }
+}
+
 bool Z3SolverImpl::internalRunSolver(
     const Query &query, const std::vector<const Array *> *objects,
     std::vector<std::vector<unsigned char> > *values, bool &hasSolution) {
   TimerStatIncrementer t(stats::queryTime);
-  // TODO: Does making a new solver for each query have a performance
-  // impact vs making one global solver and using push and pop?
-  // TODO: is the "simple_solver" the right solver to use for
-  // best performance?
-  if (!incremental) {
+
+  if (!incremental || !inc_index) {
     Z3_solver_reset(builder->ctx, theSolver);
     inc_index = 0;
     assert(Z3_solver_get_num_scopes(builder->ctx, theSolver) == 0);
@@ -205,10 +227,13 @@ bool Z3SolverImpl::internalRunSolver(
   runStatusCode = SOLVER_RUN_STATUS_FAILURE;
 
   if (incremental && !query.constraints.empty()) {
-    Z3_solver_push(builder->ctx, theSolver);
+    // Keep the first layer without extra context to use faster solver
+    if (inc_index)
+      Z3_solver_push(builder->ctx, theSolver);
     ++inc_index;
   }
 
+  // Put all constraints on the solver state
   for (ConstraintSetView::const_iterator it = query.constraints.begin(),
                                          ie = query.constraints.end();
        it != ie; ++it) {
@@ -218,27 +243,35 @@ bool Z3SolverImpl::internalRunSolver(
   if (objects)
     ++stats::queryCounterexamples;
 
-  Z3ASTHandle z3QueryExpr =
-      Z3ASTHandle(builder->construct(query.expr), builder->ctx);
+  // If the query is false, don't add it as another constraint
+  // nor push() a new solver context
+  bool addedImplicationContext = false;
+  if (query.expr != ConstantExpr::alloc(0, Expr::Bool)) {
+    // Open a new context  for the implication
+    if (incremental) {
+      Z3_solver_push(builder->ctx, theSolver);
+      ++inc_index;
+      addedImplicationContext = true;
+    }
 
-  // Open a new context  for the implication
-  if (incremental) {
-    Z3_solver_push(builder->ctx, theSolver);
-    ++inc_index;
+    // KLEE Queries are validity queries i.e.
+    // ∀ X Constraints(X) → query(X)
+    // but Z3 works in terms of satisfiability so instead we ask the
+    // negation of the equivalent i.e.
+    // ∃ X Constraints(X) ∧ ¬ query(X)
+    Z3ASTHandle z3QueryExpr =
+        Z3ASTHandle(builder->construct(query.expr), builder->ctx);
+    Z3_solver_assert(
+        builder->ctx, theSolver,
+        Z3ASTHandle(Z3_mk_not(builder->ctx, z3QueryExpr), builder->ctx));
   }
-  // KLEE Queries are validity queries i.e.
-  // ∀ X Constraints(X) → query(X)
-  // but Z3 works in terms of satisfiability so instead we ask the
-  // negation of the equivalent i.e.
-  // ∃ X Constraints(X) ∧ ¬ query(X)
-  Z3_solver_assert(
-      builder->ctx, theSolver,
-      Z3ASTHandle(Z3_mk_not(builder->ctx, z3QueryExpr), builder->ctx));
 
   ::Z3_lbool satisfiable = Z3_solver_check(builder->ctx, theSolver);
   runStatusCode = handleSolverResponse(theSolver, satisfiable, objects, values,
                                        hasSolution);
-  if (incremental) {
+  printZ3Query();
+
+  if (addedImplicationContext) {
     // Remove context for implication
     Z3_solver_pop(builder->ctx, theSolver, 1);
     --inc_index;
