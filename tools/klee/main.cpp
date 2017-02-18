@@ -469,7 +469,8 @@ void KleeHandler::processTestCase(const ExecutionState &state,
 
     if (errorMessage) {
       llvm::raw_ostream *f = openTestFile(errorSuffix, id);
-      *f << errorMessage;
+      if (f)
+        *f << errorMessage;
       delete f;
     }
 
@@ -478,11 +479,12 @@ void KleeHandler::processTestCase(const ExecutionState &state,
       m_pathWriter->readStream(m_interpreter->getPathStreamID(state),
                                concreteBranches);
       llvm::raw_fd_ostream *f = openTestFile("path", id);
-      for (std::vector<unsigned char>::iterator I = concreteBranches.begin(),
-                                                E = concreteBranches.end();
-           I != E; ++I) {
-        *f << *I << "\n";
-      }
+      if (f)
+        for (std::vector<unsigned char>::iterator I = concreteBranches.begin(),
+                                                  E = concreteBranches.end();
+             I != E; ++I) {
+          *f << *I << "\n";
+        }
       delete f;
     }
 
@@ -490,7 +492,8 @@ void KleeHandler::processTestCase(const ExecutionState &state,
       std::string constraints;
       m_interpreter->getConstraintLog(state, constraints,Interpreter::KQUERY);
       llvm::raw_ostream *f = openTestFile("kquery", id);
-      *f << constraints;
+      if (f)
+        *f << constraints;
       delete f;
     }
 
@@ -500,7 +503,8 @@ void KleeHandler::processTestCase(const ExecutionState &state,
       std::string constraints;
       m_interpreter->getConstraintLog(state, constraints, Interpreter::STP);
       llvm::raw_ostream *f = openTestFile("cvc", id);
-      *f << constraints;
+      if (f)
+        *f << constraints;
       delete f;
     }
 
@@ -508,7 +512,8 @@ void KleeHandler::processTestCase(const ExecutionState &state,
       std::string constraints;
         m_interpreter->getConstraintLog(state, constraints, Interpreter::SMTLIB2);
         llvm::raw_ostream *f = openTestFile("smt2", id);
-        *f << constraints;
+        if (f)
+          *f << constraints;
         delete f;
     }
 
@@ -517,9 +522,12 @@ void KleeHandler::processTestCase(const ExecutionState &state,
       m_symPathWriter->readStream(m_interpreter->getSymbolicPathStreamID(state),
                                   symbolicBranches);
       llvm::raw_fd_ostream *f = openTestFile("sym.path", id);
-      for (std::vector<unsigned char>::iterator I = symbolicBranches.begin(), E = symbolicBranches.end(); I!=E; ++I) {
-        *f << *I << "\n";
-      }
+      if (f)
+        for (std::vector<unsigned char>::iterator I = symbolicBranches.begin(),
+                                                  E = symbolicBranches.end();
+             I != E; ++I) {
+          *f << *I << "\n";
+        }
       delete f;
     }
 
@@ -527,14 +535,16 @@ void KleeHandler::processTestCase(const ExecutionState &state,
       std::map<const std::string*, std::set<unsigned> > cov;
       m_interpreter->getCoveredLines(state, cov);
       llvm::raw_ostream *f = openTestFile("cov", id);
-      for (std::map<const std::string*, std::set<unsigned> >::iterator
-             it = cov.begin(), ie = cov.end();
-           it != ie; ++it) {
-        for (std::set<unsigned>::iterator
-               it2 = it->second.begin(), ie = it->second.end();
-             it2 != ie; ++it2)
-          *f << *it->first << ":" << *it2 << "\n";
-      }
+      if (f)
+        for (std::map<const std::string *, std::set<unsigned> >::iterator
+                 it = cov.begin(),
+                 ie = cov.end();
+             it != ie; ++it) {
+          for (std::set<unsigned>::iterator it2 = it->second.begin(),
+                                            ie = it->second.end();
+               it2 != ie; ++it2)
+            *f << *it->first << ":" << *it2 << "\n";
+        }
       delete f;
     }
 
@@ -544,8 +554,8 @@ void KleeHandler::processTestCase(const ExecutionState &state,
     if (WriteTestInfo) {
       double elapsed_time = util::getWallTime() - start_time;
       llvm::raw_ostream *f = openTestFile("info", id);
-      *f << "Time to generate test case: "
-         << elapsed_time << "s\n";
+      if (f)
+        *f << "Time to generate test case: " << elapsed_time << "s\n";
       delete f;
     }
   }
