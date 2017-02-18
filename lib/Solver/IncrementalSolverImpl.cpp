@@ -49,6 +49,16 @@ struct SolvingState {
   SolvingState(Solver *solver_)
       : solver(static_cast<ClientProcessAdapterSolver *>(solver_)),
         stackDepth(0), inactive(0), solver_id(0) {}
+
+  // Clear solver state
+  void clear() {
+    usedConstraints.clear();
+    used_expression.clear();
+    used_positions.clear();
+    insertLevel.clear();
+    used_arrays.clear();
+    stackDepth = 0;
+  }
 };
 
 class IncrementalSolverImpl : public SolverImpl {
@@ -552,7 +562,13 @@ bool IncrementalSolverImpl::computeTruth(const Query &q, bool &isValid) {
 //  return solvers[0]->impl->computeTruth(q, isValid);
 //  auto newQuery = getPartialQuery(q, false);
   auto newQuery = getPartialQuery(q, true);
-  return activeSolver->solver->impl->computeTruth(newQuery, isValid);
+
+  if (!activeSolver->solver->impl->computeTruth(newQuery, isValid)) {
+    activeSolver->clear();
+    return false;
+  }
+
+  return true;
 }
 
 bool IncrementalSolverImpl::computeValidity(const Query &q,
@@ -570,8 +586,10 @@ bool IncrementalSolverImpl::computeValidity(const Query &q,
   bool isTrue, isFalse;
 
   // The query p -> q should have the shape: (p,not q) -> F
-  if (!activeSolver->solver->impl->computeTruth(newQuery, isTrue))
+  if (!activeSolver->solver->impl->computeTruth(newQuery, isTrue)) {
+    activeSolver->clear();
     return false;
+  }
   if (isTrue){
     result = Solver::True;
     return true;
@@ -581,8 +599,10 @@ bool IncrementalSolverImpl::computeValidity(const Query &q,
   // Modify solver instance
   // XXX optimize me: we already know the right solver instance just update it explicitly
   auto negatedQuery = getPartialQuery(q.negateExpr(), true);
-  if (!activeSolver->solver->impl->computeTruth(negatedQuery, isFalse))
+  if (!activeSolver->solver->impl->computeTruth(negatedQuery, isFalse)) {
+    activeSolver->clear();
     return false;
+  }
 
   result = isFalse ? Solver::False : Solver::Unknown;
   return true;
@@ -592,7 +612,11 @@ bool IncrementalSolverImpl::computeValue(const Query &q, ref<Expr> &result) {
 //  return solvers[0]->impl->computeValue(q, result);
 
   auto newQuery = getPartialQuery(q, false);
-  return activeSolver->solver->impl->computeValue(newQuery, result);
+  if (!activeSolver->solver->impl->computeValue(newQuery, result)) {
+    activeSolver->clear();
+    return false;
+  }
+  return true;
 }
 
 bool IncrementalSolverImpl::computeInitialValues(
@@ -602,8 +626,12 @@ bool IncrementalSolverImpl::computeInitialValues(
   // use the static solver
 //  return solvers[0]->impl->computeInitialValues(query, objects, values, hasSolution);
   auto newQuery = getPartialQuery(query, true);
-  return activeSolver->solver->impl->computeInitialValues(newQuery, objects,
-                                                          values, hasSolution);
+  if (!activeSolver->solver->impl->computeInitialValues(newQuery, objects,
+                                                        values, hasSolution)) {
+    activeSolver->clear();
+    return false;
+  }
+  return true;
 }
 
 SolverImpl::SolverRunStatus IncrementalSolverImpl::getOperationStatusCode() {
