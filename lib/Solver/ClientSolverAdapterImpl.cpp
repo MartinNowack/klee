@@ -113,17 +113,14 @@ private:
     auto solverPath = findSolverExecutable();
     processPid = fork();
     if (processPid == -1) {
-      fprintf(stderr, "ERROR: fork failed (for STP)");
-      //      if (!IgnoreSolverFailures)
-      exit(1);
+      klee_error(RuntimeSolver, "Fork failed for ClientSolverAdapter");
     }
     if (processPid == 0) {
       char *argv[] = {const_cast<char *>(solverPath.data()),
                       const_cast<char *>(shared_mem_id.c_str()),
 		      const_cast<char *>(std::to_string(CoreSolverToUse.getValue()).c_str()), nullptr};
       execvp(argv[0], &argv[0]);
-      fprintf(stderr, "ERROR: Execve failed %s", strerror(errno));
-      exit(1);
+      klee_error(RuntimeSolver, "Execvp() failed %s", strerror(errno));
     }
   }
 
@@ -165,9 +162,10 @@ private:
       } else {
         // Something happened
         runStatusCode = SOLVER_RUN_STATUS_UNEXPECTED_EXIT_CODE;
-        fprintf(stderr, "ERROR: Solver unexpected exit code (for STP)");
-        if (!IgnoreSolverFailures)
-          exit(1);
+        if (IgnoreSolverFailures)
+          klee_warning("Solver terminated unexpectedly");
+        else
+          klee_error(RuntimeSolver, "Solver terminated unexpectedly");
       }
       killProcess();
 
