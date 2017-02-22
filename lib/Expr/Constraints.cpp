@@ -243,7 +243,7 @@ bool ConstraintManager::rewriteConstraints(ExprVisitor &visitor, ref<Expr> e_) {
   }
 
   // check if we can copy all
-  if (constraintSetView.independence_cache.empty()) {
+  if (constraintSetView.independence_cache.empty() && !changed) {
     constraintSetView.independence_cache = std::move(old.independence_cache);
     constraintSetView.origPosition = std::move(old.origPosition);
 
