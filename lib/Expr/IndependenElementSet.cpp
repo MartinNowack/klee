@@ -151,7 +151,7 @@ bool IndependentElementSet::add(const IndependentElementSet &b) {
         elements.insert(*it);
       } else {
         // Now need to see if there are any (z=?)'s
-        if (it2->second |= it->second)
+        if ((it2->second |= it->second))
           modified = true;
       }
     }
