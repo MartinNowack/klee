@@ -58,12 +58,7 @@ TEST(ExprSerialization, ReadArrayConcrete) {
   auto s = serializeExpression(re);
   auto d = deserializeExpression(s, &cache);
 
-  auto re2 = dyn_cast<ReadExpr>(d);
-
-  for (size_t i = 0, j = ar->constantValues.size(); i != j; ++i) {
-    EXPECT_TRUE(*re2->updates.root->constantValues[i] ==
-                *ar->constantValues[i]);
-  }
+  EXPECT_TRUE(*re == *d);
 }
 
 TEST(ExprSerialization, ReadArraySymbolic) {

@@ -4,7 +4,7 @@ LEVEL := ../..
 include $(LEVEL)/Makefile.config
 
 TESTNAME := Assignment
-USEDLIBS := kleaverExpr.a
+USEDLIBS := kleaverSolver.a kleaverExpr.a kleeSupport.a kleeBasic.a kleaverSolver.a
 LINK_COMPONENTS := support
 
 include $(LLVM_SRC_ROOT)/unittests/Makefile.unittest

@@ -181,7 +181,7 @@ TEST(ExprTest, ReadExprFoldingConstantUpdate) {
   // Check that constant folding worked
   EXPECT_EQ(Expr::Constant, read.get()->getKind());
   ConstantExpr *c = static_cast<ConstantExpr *>(read.get());
-  EXPECT_EQ(32, c->getZExtValue());
+  EXPECT_EQ(32u, c->getZExtValue());
 }
 
 TEST(ExprTest, ReadExprFoldingConstantMultipleUpdate) {
@@ -208,7 +208,7 @@ TEST(ExprTest, ReadExprFoldingConstantMultipleUpdate) {
   // Check that constant folding worked
   EXPECT_EQ(Expr::Constant, read.get()->getKind());
   ConstantExpr *c = static_cast<ConstantExpr *>(read.get());
-  EXPECT_EQ(64, c->getZExtValue());
+  EXPECT_EQ(64u, c->getZExtValue());
 }
 
 TEST(ExprTest, ReadExprFoldingSymbolicValueUpdate) {

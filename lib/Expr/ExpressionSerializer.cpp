@@ -764,14 +764,16 @@ template <class T> class ExpressionDeserializer {
     if (it != updates.end()) {
       return it->second;
     }
-    auto constE = ConstantExpr::create(4, 8);
     auto serNode = updateNodeReader[index - 1].getPtr();
+    // Set a concrete value, to calculate hash during construction
+    auto constE = ConstantExpr::create(4, 8);
     auto node = new UpdateNode(nullptr, constE, constE);
     updates.insert(std::make_pair(index, node));
 
+    node->next = getUpdateNode(serNode.getNext());
     node->index = genExpr(serNode.getIndex());
     node->value = genExpr(serNode.getValue());
-    node->next = getUpdateNode(serNode.getNext());
+
     node->setSize(serNode.getSize());
     node->setHash(serNode.getHashValue());
 
