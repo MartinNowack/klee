@@ -32,6 +32,8 @@
 #include "klee/Internal/Module/KModule.h"
 #include "klee/util/ExprVisitor.h"
 
+#include "ConstraintTools.h"
+
 using namespace klee;
 
 namespace {
@@ -99,7 +101,8 @@ void ConstraintSetView::dump() const {
   for (auto it = begin(), itE = end(); it != itE; ++it) {
     auto origPosition = getPositions(it);
     llvm::errs() << "{" << origPosition.constraint_id << "/"
-                 << origPosition.constraint_width << "}\n";
+                 << origPosition.constraint_width << "/" << origPosition.version
+                 << "}\n";
     (*it)->dump();
   }
 }
@@ -183,29 +186,14 @@ public:
   }
 };
 
-class ExprCountVisitor : public ExprVisitor {
-private:
-  uint64_t counter;
-
-protected:
-  Action visitExprPost(const Expr &e) {
-    ++counter;
-    return Action::skipChildren();
-  }
-
-public:
-  ExprCountVisitor() : ExprVisitor(true), counter(0) {}
-
-  uint64_t getCounter() { return counter; }
-};
-
 ConstraintPosition::ConstraintPosition(
     uint64_t constraint_id_, uint64_t constraint_width_, uint64_t version_)
     : constraint_id(constraint_id_), constraint_width(constraint_width_),
       version(version_) {}
 
 void ConstraintPosition::dump() const {
-  llvm::errs() << "(" << constraint_id << ":" << constraint_width << ")\n";
+  llvm::errs() << "(" << constraint_id << ":" << constraint_width << ":"
+               << version << ")\n";
 }
 
 bool ConstraintManager::rewriteConstraints(ExprVisitor &visitor, ref<Expr> e_) {

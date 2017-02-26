@@ -139,6 +139,8 @@ private:
   void addNoneIntersectionExpressions(ConstraintSetView &other);
 
   void orderIndependenceSetByConstraintPosition();
+
+public:
   static uint64_t next_free_position;
   static uint64_t version_cntr;
 

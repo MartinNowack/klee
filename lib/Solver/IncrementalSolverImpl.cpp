@@ -22,12 +22,13 @@
 namespace {
 llvm::cl::opt<bool> NaiveIncremental(
     "naive-incremental",
-    llvm::cl::desc("Ignore any solver failures (default=off)"),
+    llvm::cl::desc("Use naive incremental implementation (default=off)"),
     llvm::cl::init(false));
-llvm::cl::opt<int>
-    ParallelIncSolvers("parallel-incremental-solvers",
-                       llvm::cl::desc("Ignore any solver failures (default=4)"),
-                       llvm::cl::init(8));
+
+llvm::cl::opt<int> ParallelIncSolvers(
+    "parallel-incremental-solvers",
+    llvm::cl::desc("Number of parallel solver instances (default=8)"),
+    llvm::cl::init(8));
 }
 namespace klee {
 
@@ -252,16 +253,17 @@ Query IncrementalSolverImpl::getPartialQuery_naive_incremental(
     constraints_to_add.insert((*i).exprs.begin(), (*i).exprs.end());
   }
 
-  size_t reused = constraints_to_add.size();
-
   // Simple, we just check how many constraints we have in common and remove
   // the uncommon ones
   // Each indep set contains one stack frame of constraints
   size_t maxStackDepth = 0;
+  size_t nonConflictingConstraints = 0;
   for (auto &solver_frame : activeSolver->used_expression) {
     if (!solver_frame.intersects(query_constraint_iset) && !solver_frame.intersects(query_expr_iset)) {
       // if the solver stack frame doesn't intersect, we can keep that frame
       ++maxStackDepth;
+
+      nonConflictingConstraints += solver_frame.exprs.size();
       continue;
     }
 
@@ -286,23 +288,25 @@ Query IncrementalSolverImpl::getPartialQuery_naive_incremental(
     if (abort)
       break;
 
-    // delete the found expressions
+    // Remember constraints that are already part of the solver state,
+    // they will be removed.
     constraints_to_remove.insert(temp_found_expressions.begin(), temp_found_expressions.end());
     ++maxStackDepth;
   }
 
-  // Remove the remaining constraints
+  // Remove the constraints which are already part of the solver state
   for (auto & exp:constraints_to_remove)
     constraints_to_add.erase(exp);
 
   // Will use this solver
   // Update statistics and save constraints
-  q.non_conflicting_cntr = activeSolver->usedConstraints.size();
+  q.non_conflicting_cntr = nonConflictingConstraints;
   q.added_cntr = constraints_to_add.size();
   q.solver_id = activeSolver->solver_id;
-
-  if (constraints_to_remove.empty())
-	  maxStackDepth = 0;
+  q.solver_stack_reduced = activeSolver->used_expression.size() - maxStackDepth;
+  q.reused_cntr = constraints_to_remove.size();
+  //  q.non_conflicting_cntr -= q.reused_cntr;
+  q.solver_state_stack_height = maxStackDepth;
 
   // Clean up previous levels
   activeSolver->used_expression.erase(activeSolver->used_expression.begin() +
@@ -324,8 +328,8 @@ Query IncrementalSolverImpl::getPartialQuery_naive_incremental(
   if (maxStackDepth) {
     ++stats::queryIncremental;
     q.incremental_flag = true;
-    q.reused_cntr += (reused - constraints_to_add.size());
   }
+
   return Query(activeConstraints, q.expr, q.queryOrigin);
 }
 
@@ -444,7 +448,7 @@ Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
     solver_max_stack_depth.push_back(maxStackDepth);
   }
 
-  // Now select the best suitabel solver
+  // Now select the best suitable solver
 
   size_t max_reuse = 0;
   size_t best_solver = 0, current_solver = 0;
