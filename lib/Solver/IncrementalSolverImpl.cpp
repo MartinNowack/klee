@@ -421,13 +421,13 @@ Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
         if (found)
           continue;
 
-        // Check if we find that query in our constraints
-        auto it = std::find(constraints_to_add.begin(),
-                            constraints_to_add.end(), expr);
-        if (it != constraints_to_add.end()) {
-          temp_found_expressions.push_back(it - constraints_to_add.begin());
-          continue; // yes, check the next
-        }
+//        // Check if we find that query in our constraints
+//        auto it = std::find(constraints_to_add.begin(),
+//                            constraints_to_add.end(), expr);
+//        if (it != constraints_to_add.end()) {
+//          temp_found_expressions.push_back(it - constraints_to_add.begin());
+//          continue; // yes, check the next
+//        }
 
         // no, so we have to abort
         abort = true;
@@ -474,6 +474,7 @@ Query IncrementalSolverImpl::getPartialQuery_simple_incremental(
       for (size_t i = 1; i < max_solvers; ++i) {
         if (active_incremental_solvers[i].inactive == max_inactive) {
           activeSolver = &active_incremental_solvers[i];
+          maxStackDepth = solver_max_stack_depth[i];
           break;
         }
       }
