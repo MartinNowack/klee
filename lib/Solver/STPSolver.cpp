@@ -412,7 +412,7 @@ bool STPSolverImpl::computePartialInitialValues(
     unsigned long len;
     static unsigned counter = 0;
     vc_printQueryStateToBuffer(vc, stp_e, &buf, &len, false);
-    klee_warning("STP query:%u %u\n%.*s\n", counter++, stackIndex, (unsigned)len, buf);
+    klee_warning("STP query:%u %lu\n%.*s\n", counter++, stackIndex, (unsigned)len, buf);
     free(buf);
   }
 
