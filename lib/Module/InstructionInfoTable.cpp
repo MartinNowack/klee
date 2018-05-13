@@ -110,13 +110,9 @@ bool InstructionInfoTable::getInstructionDebugInfo(llvm::Instruction *I,
   DbgDeclareInst *DDI = 0;
   if (isa<AllocaInst>(I)) {
     DDI = FindAllocaDbgDeclare(I);
-  } else if (isa<StoreInst>(I) || isa<LoadInst>(I)) {
-    // Check if the following instruction is a DbgDeclareIsnt
-    BasicBlock::iterator it(I);
-    ++it;
-    DDI = dyn_cast<DbgDeclareInst>(&*it);
-  }
-  if (DDI) {
+    if (!DDI)
+      return false;
+
     // Get variable description meta data
     DIVariable var_node(DDI->getVariable());
     File = internString(var_node.getFile().getFilename());
