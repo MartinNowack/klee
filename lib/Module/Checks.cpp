@@ -48,6 +48,11 @@ bool DivCheckPass::runOnModule(Module &M) {
             opcode != Instruction::SRem && opcode != Instruction::URem)
           continue;
 
+        // Check if the operand is constant and not zero, skip in that case.
+        auto operand = binOp->getOperand(1);
+        if (auto coOp = dyn_cast<llvm::Constant>(operand)) {
+          if (!coOp->isZeroValue())
+            continue;
         }
 
         divInstruction.push_back(binOp);
@@ -92,6 +97,16 @@ bool OvershiftCheckPass::runOnModule(Module &M) {
         if (opcode != Instruction::Shl && opcode != Instruction::LShr &&
             opcode != Instruction::AShr)
           continue;
+
+        // Check if the operand is constant and not zero, skip in that case.
+        auto operand = binOp->getOperand(1);
+        if (auto coOp = dyn_cast<llvm::ConstantInt>(operand)) {
+          auto typeWidth =
+              binOp->getOperand(0)->getType()->getScalarSizeInBits();
+          // If the constant shift is positive and smaller,equal the type width,
+          // we can ignore this instruction
+          if (!coOp->isNegative() && coOp->getZExtValue() <= typeWidth)
+            continue;
         }
 
         shiftInst.push_back(binOp);
