@@ -10,6 +10,7 @@
 #include "Passes.h"
 
 #include "klee/Config/Version.h"
+#include "llvm/Analysis/MemoryBuiltins.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
@@ -224,24 +225,44 @@ bool IntrinsicCleanerPass::runOnBasicBlock(BasicBlock &b, Module &M) {
         break;
       }
       case Intrinsic::objectsize: {
-        // We don't know the size of an object in general so we replace
-        // with 0 or -1 depending on the second argument to the intrinsic.
-        assert(ii->getNumArgOperands() == 2 && "wrong number of arguments");
-        Value *minArg = ii->getArgOperand(1);
-        assert(minArg && "Failed to get second argument");
-        ConstantInt *minArgAsInt = dyn_cast<ConstantInt>(minArg);
-        assert(minArgAsInt && "Second arg is not a ConstantInt");
-        assert(minArgAsInt->getBitWidth() == 1 &&
-               "Second argument is not an i1");
+        // We try to evaluate the size of an object. In case this fails,
+        // we return conservative values.
         Value *replacement = NULL;
         IntegerType *intType = dyn_cast<IntegerType>(ii->getType());
-        assert(intType && "intrinsic does not have integer return type");
-        if (minArgAsInt->isZero()) {
-          // min=false
-          replacement = ConstantInt::get(intType, -1, /*isSigned=*/true);
+        ii->dump();
+        size_t objectSize;
+
+#if LLVM_VERSION_CODE >= LLVM_VERSION(3, 6)
+        auto gotSize =
+            llvm::getObjectSize(ii->getArgOperand(0), objectSize, DataLayout,
+                                nullptr, false /* RoundToAlign */);
+#else
+        auto gotSize =
+            llvm::getObjectSize(ii->getArgOperand(0), objectSize, &DataLayout,
+                                nullptr, false /* RoundToAlign */);
+#endif
+
+        if (gotSize) {
+          replacement =
+              ConstantInt::get(intType, objectSize, /*isSigned=*/true);
         } else {
-          // min=true
-          replacement = ConstantInt::get(intType, 0, /*isSigned=*/false);
+          // We don't know the size of an object in general so we replace
+          // with 0 or -1 depending on the second argument to the intrinsic.
+          assert(ii->getNumArgOperands() == 2 && "wrong number of arguments");
+          Value *minArg = ii->getArgOperand(1);
+          assert(minArg && "Failed to get second argument");
+          ConstantInt *minArgAsInt = dyn_cast<ConstantInt>(minArg);
+          assert(minArgAsInt && "Second arg is not a ConstantInt");
+          assert(minArgAsInt->getBitWidth() == 1 &&
+                 "Second argument is not an i1");
+          assert(intType && "intrinsic does not have integer return type");
+          if (minArgAsInt->isZero()) {
+            // min=false
+            replacement = ConstantInt::get(intType, -1, /*isSigned=*/true);
+          } else {
+            // min=true
+            replacement = ConstantInt::get(intType, 0, /*isSigned=*/true);
+          }
         }
         ii->replaceAllUsesWith(replacement);
         ii->eraseFromParent();

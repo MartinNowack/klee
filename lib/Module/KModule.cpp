@@ -154,7 +154,11 @@ static void injectStaticConstructorsAndDestructors(Module *m) {
     klee_error("Could not find main() function.");
 
   if (ctors) {
+#if LLVM_VERSION_CODE >= LLVM_VERSION(3, 8)
+    llvm::IRBuilder<> Builder(&*mainFn->begin()->begin());
+#else
     llvm::IRBuilder<> Builder(mainFn->begin()->begin());
+#endif
     Builder.CreateCall(getStubFunctionForCtorList(m, ctors, "klee.ctor_stub"));
   }
 
