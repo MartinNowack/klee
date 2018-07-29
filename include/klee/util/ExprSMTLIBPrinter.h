@@ -1,5 +1,4 @@
-//===-- ExprSMTLIBPrinter.h ------------------------------------------*- C++
-//-*-===//
+//===-- ExprSMTLIBPrinter.h -------------------------------------*- C++ -*-===//
 //
 //                     The KLEE Symbolic Virtual Machine
 //

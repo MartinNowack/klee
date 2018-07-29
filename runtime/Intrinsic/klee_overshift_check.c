@@ -1,4 +1,4 @@
-//===-- klee_overshift_check.c ---------------------------------------------===//
+//===-- klee_overshift_check.c --------------------------------------------===//
 //
 //                     The KLEE Symbolic Virtual Machine
 //
