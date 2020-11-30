@@ -43,6 +43,7 @@ jobs:
             # cmake-args: -G "Unix Makefiles"
             env:
               LLVM_VERSION: 3.8
+              USE_LIBCXX: 0
 
     steps:
       - name: Checkout KLEE Code
