@@ -3,6 +3,9 @@ name: Build
 on:
   pull_request:
     branches: master
+  # Refactor to use different build strategies
+  push:
+    branches: master
 
 # Defaults for building
 env:
