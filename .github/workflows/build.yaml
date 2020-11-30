@@ -44,6 +44,8 @@ jobs:
             env:
               LLVM_VERSION: 3.8
               USE_LIBCXX: 0
+          - name: "LLVM 10"
+            env: LLVM_VERSION=10.0
 
     steps:
       - name: Checkout KLEE Code
