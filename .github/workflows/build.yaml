@@ -3,7 +3,6 @@ name: CI
 on:
   pull_request:
     branches: master
-  # Refactor to use different build strategies
   push:
     branches: master
 
@@ -18,7 +17,7 @@ env:
   ENABLE_DEBUG: 1
   GTEST_VERSION: 1.7.0
   KLEE_RUNTIME_BUILD: "Debug+Asserts"
-  LLVM_VERSION: 9.0
+  LLVM_VERSION: 9
   METASMT_VERSION: qf_abv
   MINISAT_VERSION: "master"
   REQUIRES_RTTI: 0
@@ -32,13 +31,13 @@ env:
   Z3_VERSION: 4.8.4
 
 jobs:
-  Linux:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        name: [
-                "LLVM 10",
-                "LLVM 9",
+#  Linux:
+#    runs-on: ubuntu-latest
+#    strategy:
+#      matrix:
+#        name: [
+#                "LLVM 10",
+#                "LLVM 9",
 #                "LLVM 8",
 #                "LLVM 7",
 #                "LLVM 6",
@@ -56,37 +55,37 @@ jobs:
 #                "Latest klee-uclibc",
 #                "Asserts enabled",
 #                "No TCMalloc, optimised runtime",
-            ]
-        include:
-          - name: "LLVM 10"
-            env:
-              LLVM_VERSION: "10.0"
-          - name: "LLVM 9"
-            env:
-              LLVM_VERSION: "9.0"
+#            ]
+#        include:
+#          - name: "LLVM 10"
+#            env:
+#              LLVM_VERSION: 10
+#          - name: "LLVM 9"
+#            env:
+#              LLVM_VERSION: 9
 #          - name: "LLVM 8"
 #            env:
-#              LLVM_VERSION: "8.0"
+#              LLVM_VERSION: 8
 #          - name: "LLVM 7"
 #            env:
-#              LLVM_VERSION: "7.0"
+#              LLVM_VERSION: 7
 #          - name: "LLVM 6"
 #            env:
-#              LLVM_VERSION: "6.0"
+#              LLVM_VERSION: 6
 #          - name: "LLVM 5"
 #            env:
-#              LLVM_VERSION: "5.0"
+#              LLVM_VERSION: 5
 #          - name: "LLVM 4"
 #            env:
-#              LLVM_VERSION: "4.0"
+#              LLVM_VERSION: 4
 #
 #          - name: "LLVM 3.9"
 #            env:
-#              LLVM_VERSION: "3.9"
+#              LLVM_VERSION: 3.9
 #
 #          - name: "LLVM 3.8"
 #            env:
-#              LLVM_VERSION: "3.8"
+#              LLVM_VERSION: 3.8
 #              USE_LIBCXX: 0
 #
 #          # Sanitizer builds. Do unoptimized build otherwise the optimizer might remove problematic code
@@ -151,41 +150,16 @@ jobs:
 #            env:
 #              USE_TCMALLOC: 0
 #              KLEE_RUNTIME_BUILD: "Release+Debug+Asserts"
-
-#          # Coverage build
-#          - name: "Coverage"
-#            env:
-#              ENABLE_OPTIMIZED: 0
-#              COVERAGE: 1
+#    steps:
+#      - name: Checkout KLEE Code
+#        uses: actions/checkout@v2
 #
-#            # Docker
-#            - name: "Docker"
-#              env: BUILD_DOCKER=1
-
-    steps:
-      - name: Checkout KLEE Code
-        uses: actions/checkout@v2
-
-      - name: Set up Docker Build Requirements
-        id: buildx
-        uses: docker/setup-buildx-action@v1
-
-#      - name: Cache Docker layers
-#        uses: actions/cache@v2
-#        with:
-#          path: /tmp/.buildx-cache
-#          key: ${{ runner.os }}-buildx-${{ github.sha }}
-#          restore-keys: |
-#            ${{ runner.os }}-buildx-
-
-      - name: Build using Docker
-        env: ${{ matrix.env }}
-        run: |
-          scripts/build/build.sh klee --docker --create-final-image
-
-      - name: Run tests
-        run: |
-          sudo scripts/build/run-tests.sh --run-docker --debug
+#      - name: Build using Docker
+#        env: ${{ matrix.env }}
+#        run: scripts/build/build.sh klee --docker --create-final-image
+#
+#      - name: Run tests
+#        run: sudo scripts/build/run-tests.sh --run-docker --debug
   macOS:
     runs-on: macos-latest
     env:
@@ -195,9 +169,9 @@ jobs:
       USE_TCMALLOC: 0
       USE_LIBCXX: 0
     steps:
-      - name: Set up Homebrew
-        id: set-up-homebrew
-        uses: Homebrew/actions/setup-homebrew@master
+#      - name: Set up Homebrew
+#        id: set-up-homebrew
+#        uses: Homebrew/actions/setup-homebrew@master
       - name: Install newer version of bash
         run: brew install bash
       - name: Checkout KLEE Code
@@ -206,7 +180,8 @@ jobs:
         run: scripts/build/build.sh klee --debug --install-system-deps
       - name: Run tests
         run: scripts/build/run-tests.sh /tmp/klee_build* --debug
-  docker:
+
+  Docker:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout KLEE Code
@@ -215,4 +190,17 @@ jobs:
       - name: Build Docker image
         run: docker build .
 
+  Coverage:
+    env:
+      ENABLE_OPTIMIZED: 0
+      COVERAGE: 1
+    steps:
+      - name: Checkout KLEE Code
+        uses: actions/checkout@v2
 
+      - name: Build using Docker
+        env: ${{ matrix.env }}
+        run: scripts/build/build.sh klee --docker --create-final-image
+
+      - name: Run tests
+        run: sudo scripts/build/run-tests.sh --run-docker --debug
