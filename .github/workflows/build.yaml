@@ -163,9 +163,13 @@ jobs:
       - name: Checkout KLEE Code
         uses: actions/checkout@v2
       - name: Build KLEE
-        run: scripts/build/build.sh klee --debug --install-system-deps
+        run: |
+          export CFLAGS+=-isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
+          scripts/build/build.sh klee --debug --install-system-deps
       - name: Run tests
-        run: scripts/build/run-tests.sh /tmp/klee_build* --debug
+        run: |
+          export CFLAGS+=-isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
+          scripts/build/run-tests.sh /tmp/klee_build* --debug
 
 #  Docker:
 #    runs-on: ubuntu-latest
