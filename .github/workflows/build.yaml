@@ -158,8 +158,8 @@ jobs:
     steps:
       - name: Install newer version of Bash
         run: brew install bash
-      - name: Install header files
-        run: xcode-select --install
+#      - name: Install header files
+#        run: xcode-select --install
       - name: Checkout KLEE Code
         uses: actions/checkout@v2
       - name: Build KLEE
@@ -186,4 +186,4 @@ jobs:
       - name: Build using Docker
         run: scripts/build/build.sh klee --docker --create-final-image
       - name: Run tests
-        run: sudo scripts/build/run-tests.sh --run-docker --debug
+        run: sudo scripts/build/run-tests.sh --coverage --upload-coverage --run-docker --debug
