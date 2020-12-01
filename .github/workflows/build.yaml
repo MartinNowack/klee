@@ -1,4 +1,4 @@
-name: Build
+name: CI
 
 on:
   pull_request:
@@ -157,20 +157,11 @@ jobs:
 #            env:
 #              ENABLE_OPTIMIZED: 0
 #              COVERAGE: 1
-#          # macOS
-#          - name: "macOS"
-#            os:
-#              osx
-#            osx_image: xcode12.2
-#            env: SOLVERS=STP UCLIBC_VERSION=0 USE_TCMALLOC=0 USE_LIBCXX=0
 #
 #            # Docker
 #            - name: "Docker"
 #              env: BUILD_DOCKER=1
-#          - name: "LLVM 3.8"
-#            env:
-#              llvm: "3.8"
-#              USE_LIBCXX: 0
+
     steps:
       - name: Checkout KLEE Code
         uses: actions/checkout@v2
@@ -215,5 +206,13 @@ jobs:
         run: scripts/build/build.sh klee --debug --install-system-deps
       - name: Run tests
         run: scripts/build/run-tests.sh /tmp/klee_build* --debug
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout KLEE Code
+        uses: actions/checkout@v2
+
+      - name: Build Docker image
+        run: docker build .
 
 
