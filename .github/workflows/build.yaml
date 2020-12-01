@@ -38,12 +38,12 @@ jobs:
       matrix:
         os: [ubuntu-18.04]
         include:
-#          - name: "LLVM 3.8"
-#            os: ubuntu-18.04
-#            # cmake-args: -G "Unix Makefiles"
-#            env:
-#              LLVM_VERSION: 3.8
-#              USE_LIBCXX: 0
+          - name: "LLVM 3.8"
+            os: ubuntu-18.04
+            # cmake-args: -G "Unix Makefiles"
+            env:
+              LLVM_VERSION: 3.8
+              USE_LIBCXX: 0
           - name: "LLVM 10"
             env:
               LLVM_VERSION: 10.0
