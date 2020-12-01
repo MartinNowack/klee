@@ -191,6 +191,7 @@ jobs:
         run: docker build .
 
   Coverage:
+    runs-on: ubuntu-latest
     env:
       ENABLE_OPTIMIZED: 0
       COVERAGE: 1
