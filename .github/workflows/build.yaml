@@ -204,6 +204,11 @@ jobs:
       USE_TCMALLOC: 0
       USE_LIBCXX: 0
     steps:
+      - name: Set up Homebrew
+        id: set-up-homebrew
+        uses: Homebrew/actions/setup-homebrew@master
+      - name: Install newer version of bash
+        run: brew install bash
       - name: Checkout KLEE Code
         uses: actions/checkout@v2
       - name: Build KLEE
