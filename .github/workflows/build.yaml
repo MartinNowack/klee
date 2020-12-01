@@ -56,9 +56,6 @@ jobs:
                 "Latest klee-uclibc",
                 "Asserts enabled",
                 "No TCMalloc, optimised runtime",
-                "Coverage",
-                "macOS",
-                "Docker",
             ]
         include:
           - name: "LLVM 10"
