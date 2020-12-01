@@ -139,9 +139,9 @@ jobs:
 #              USE_TCMALLOC: 0
 #              KLEE_RUNTIME_BUILD: "Release+Debug+Asserts"
 #    steps:
-#      - name: Checkout KLEE Code
+#      - name: Checkout KLEE source code
 #        uses: actions/checkout@v2
-#      - name: Build using Docker
+#      - name: Build KLEE
 ##        env: ${{ matrix.env }}
 #        run: scripts/build/build.sh klee --docker --create-final-image
 #      - name: Run tests
@@ -160,7 +160,7 @@ jobs:
         run: brew install bash
 #      - name: Install header files
 #        run: xcode-select --install
-      - name: Checkout KLEE Code
+      - name: Checkout KLEE source code
         uses: actions/checkout@v2
       - name: Build KLEE
         run: |
@@ -179,15 +179,15 @@ jobs:
 #      - name: Build Docker image
 #        run: docker build .
 
-  Coverage:
-    runs-on: ubuntu-latest
-    env:
-      ENABLE_OPTIMIZED: 0
-      COVERAGE: 1
-    steps:
-      - name: Checkout KLEE Code
-        uses: actions/checkout@v2
-      - name: Build using Docker
-        run: scripts/build/build.sh klee --docker --create-final-image
-      - name: Run tests
-        run: sudo scripts/build/run-tests.sh --coverage --upload-coverage --run-docker --debug
+#  Coverage:
+#    runs-on: ubuntu-latest
+#    env:
+#      ENABLE_OPTIMIZED: 0
+#      COVERAGE: 1
+#    steps:
+#      - name: Checkout KLEE source code
+#        uses: actions/checkout@v2
+#      - name: Build KLEE
+#        run: scripts/build/build.sh klee --docker --create-final-image
+#      - name: Run tests
+#        run: sudo scripts/build/run-tests.sh --coverage --upload-coverage --run-docker --debug
