@@ -204,6 +204,8 @@ jobs:
       USE_TCMALLOC: 0
       USE_LIBCXX: 0
     steps:
+      - name: Checkout KLEE Code
+        uses: actions/checkout@v2
       - name: Build KLEE
         run: scripts/build/build.sh klee --debug --install-system-deps
       - name: Run tests
