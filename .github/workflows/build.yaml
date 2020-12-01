@@ -60,33 +60,33 @@ jobs:
         include:
           - name: "LLVM 10"
             env:
-              LLVM_VERSION: 10.0
+              LLVM_VERSION: "10.0"
           - name: "LLVM 9"
             env:
-              LLVM_VERSION: 9.0
+              LLVM_VERSION: "9.0"
           - name: "LLVM 8"
             env:
-              LLVM_VERSION: 8.0
+              LLVM_VERSION: "8.0"
           - name: "LLVM 7"
             env:
-              LLVM_VERSION: 7.0
+              LLVM_VERSION: "7.0"
           - name: "LLVM 6"
             env:
-              LLVM_VERSION: 6.0
+              LLVM_VERSION: "6.0"
           - name: "LLVM 5"
             env:
-              LLVM_VERSION: 5.0
+              LLVM_VERSION: "5.0"
           - name: "LLVM 4"
             env:
-              LLVM_VERSION: 4.0
+              LLVM_VERSION: "4.0"
 
           - name: "LLVM 3.9"
             env:
-              LLVM_VERSION: 3.9
+              LLVM_VERSION: "3.9"
 
           - name: "LLVM 3.8"
             env:
-              LLVM_VERSION: 3.8
+              LLVM_VERSION: "3.8"
               USE_LIBCXX: 0
 
           # Sanitizer builds. Do unoptimized build otherwise the optimizer might remove problematic code
