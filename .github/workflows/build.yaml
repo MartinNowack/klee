@@ -164,11 +164,11 @@ jobs:
         uses: actions/checkout@v2
       - name: Build KLEE
         run: |
-          export CFLAGS+=-isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
+          export CFLAGS+="-isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk"
           scripts/build/build.sh klee --debug --install-system-deps
       - name: Run tests
         run: |
-          export CFLAGS+=-isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
+          export CFLAGS+="-isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk"
           scripts/build/run-tests.sh /tmp/klee_build* --debug
 
 #  Docker:
