@@ -50,7 +50,7 @@ run_tests() {
   if [ "${COVERAGE}" -eq 1 ]; then
     coverage_setup "${build_dir}"
   fi
-  make unittests
+  make unittests || return 1
   
   # Generate and upload coverage if COVERAGE is set
   if [ "${COVERAGE}" -eq 1 ]; then
