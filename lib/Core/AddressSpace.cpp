@@ -330,12 +330,26 @@ bool AddressSpace::copyInConcretes() {
 bool AddressSpace::copyInConcrete(const MemoryObject *mo, const ObjectState *os,
                                   uint64_t src_address) {
   auto address = reinterpret_cast<std::uint8_t*>(src_address);
-  if (memcmp(address, os->concreteStore, mo->size) != 0) {
+  // Check if the underlying representation has been changed externally
+  if (std::memcmp(address, os->concreteStore, mo->size) != 0) {
     if (os->readOnly) {
       return false;
     } else {
       ObjectState *wos = getWriteable(mo, os);
-      memcpy(wos->concreteStore, address, mo->size);
+      if (wos->flushMask) {
+        // Handle the case, that objects have been modified by external
+        // functions. Do a byte-by-byte comparison and update if needed.
+        for (size_t i = 0, ie = mo->size; i < ie; ++i) {
+          u_int8_t updated_value = *(address + i);
+          if (updated_value != wos->concreteStore[i]) {
+            wos->write8(i, updated_value);
+          }
+        }
+      } else {
+        // Handle the case that the object is a fully concrete object
+        // and do a fast update.
+        std::memcpy(wos->concreteStore, address, mo->size);
+      }
     }
   }
   return true;
