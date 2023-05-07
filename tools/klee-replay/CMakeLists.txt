@@ -8,14 +8,15 @@
 #===------------------------------------------------------------------------===#
 if (HAVE_PTY_H OR HAVE_UTIL_H OR HAVE_LIBUTIL_H)
   add_executable(klee-replay
+    cli.cpp
     fd_init.c
-    file-creator.c
-    klee-replay.c
+    file-creator.cpp
+    klee-replay.cpp
     klee_init_env.c
   )
 
   target_link_libraries(klee-replay PRIVATE kleeBasic)
-  target_include_directories(klee-replay PRIVATE ${KLEE_INCLUDE_DIRS})
+  target_include_directories(klee-replay PRIVATE ${KLEE_INCLUDE_DIRS} ${LLVM_INCLUDE_DIRS})
 
   if(LIBCAP_LIBRARIES)
     target_link_libraries(klee-replay PRIVATE ${LIBCAP_LIBRARIES})

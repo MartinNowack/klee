@@ -9,11 +9,16 @@
 
 #ifndef KLEE_REPLAY_H
 #define KLEE_REPLAY_H
-#define _LARGEFILE64_SOURCE
+
+#ifndef _LARGEFILE64_SOURCE
+#define _LARGEFILE64_SOURCE 1
+#endif
 #define _FILE_OFFSET_BITS 64
 
 // FIXME: This is a hack.
+extern "C" {
 #include "../../runtime/POSIX/fd.h"
+}
 #include <sys/time.h>
 
 // temporary directory used for replay

@@ -193,7 +193,9 @@ public:
 
   LargeObjectAllocator(LargeObjectAllocator &&rhs) noexcept
       : data(std::exchange(rhs.data, nullptr)) {
-    assert(data->referenceCount > 0);
+    if (data) {
+      assert(data->referenceCount > 0);
+    }
   }
 
   LargeObjectAllocator &operator=(LargeObjectAllocator &&rhs) noexcept {
@@ -208,6 +210,17 @@ public:
 
   inline std::ostream &logTag(std::ostream &out) const noexcept {
     return out << "[LOH] ";
+  }
+
+  std::size_t getSize(Control const &control,
+                      void const *const ptr) const noexcept {
+    assert(control.mapping_begin() <= ptr &&
+           reinterpret_cast<char const *>(ptr) < control.mapping_end() &&
+           "This property should have been ensured by the caller");
+    assert(!!data &&
+           "Can only get size of an object if objects already exist...");
+
+    return data->regions.getSize(static_cast<char const *>(ptr));
   }
 
   LocationInfo getLocationInfo(Control const &control, void const *const ptr,
@@ -279,6 +292,18 @@ public:
     auto const result = static_cast<void *>(rangePos + offset);
     traceLine("Allocation result: ", result);
     return result;
+  }
+
+  void deallocate(Control const &control, void *ptr) {
+    assert(!!data &&
+           "Deallocations can only happen if allocations happened beforehand");
+
+    if (control.unlimitedQuarantine) {
+      traceLine("Quarantining ", ptr, " for ever");
+    } else {
+      auto size = data->regions.getSize(static_cast<char const *>(ptr));
+      deallocate(control, ptr, size);
+    }
   }
 
   void deallocate(Control const &control, void *ptr, std::size_t size) {

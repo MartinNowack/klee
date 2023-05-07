@@ -2,7 +2,7 @@
 // RUN: rm -f %t.bout
 // RUN: %ktest-randgen 100 -sym-arg 4 -sym-files 2 20 -sym-arg 5 -sym-stdin 8 -sym-stdout -sym-arg 6 -sym-args 1 4 5 -bout-file %t.bout
 // RUN: %cc %s -O0 -o %t
-// RUN: %klee-replay %t %t.bout 2> %t.out
+// RUN: %klee-replay %t.bout %t 2> %t.out
 // RUN: FileCheck --input-file=%t.out %s
 // CHECK: KLEE-REPLAY: NOTE: EXIT STATUS: NORMAL
 //

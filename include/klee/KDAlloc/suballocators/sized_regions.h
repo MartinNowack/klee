@@ -159,6 +159,30 @@ public:
 
   [[nodiscard]] bool isEmpty() const noexcept { return !root; }
 
+  std::size_t getSize(char const *const address) {
+    assert(root && "Cannot get size from an empty treap");
+
+    Node const *currentNode = &*root;
+    Node const *closestPredecessor = nullptr;
+    Node const *closestSuccessor = nullptr;
+    while (currentNode) {
+      if (address < currentNode->getBaseAddress()) {
+        assert(currentNode->getBaseAddress() <
+               closestSuccessor->getBaseAddress());
+        closestSuccessor = currentNode;
+        currentNode = &*currentNode->lhs;
+      } else {
+        assert(currentNode->getBaseAddress() >
+               closestPredecessor->getBaseAddress());
+        closestPredecessor = currentNode;
+        currentNode = &*currentNode->rhs;
+      }
+    }
+    return closestSuccessor->getBaseAddress() -
+           (closestPredecessor->getBaseAddress() +
+            closestPredecessor->getSize());
+  }
+
   /// Computes the LocationInfo. This functionality really belongs to the
   /// `LargeObjectAllocator`, as it assumes that this treap contains free
   /// regions in between allocations. It also knows that there is a redzone at

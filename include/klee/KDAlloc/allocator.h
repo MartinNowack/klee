@@ -24,6 +24,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <limits>
 #include <ostream>
 #include <type_traits>
@@ -40,30 +41,38 @@ public:
     static constexpr const std::uint32_t unlimitedQuarantine =
         static_cast<std::uint32_t>(-1);
 
-    /// @todo This should really be a data member `static constexpr const
-    /// std::array meta = { ... }`.
-    static inline const std::array<std::size_t, 8> &getMeta() noexcept {
-      static const std::array<std::size_t, 8> meta = {
-          1u,    // bool
-          4u,    // int
-          8u,    // pointer size
-          16u,   // double
-          32u,   // compound types #1
-          64u,   // compound types #2
-          256u,  // compound types #3
-          2048u, // reasonable buffers
-      };
-      return meta;
-    }
+    static constexpr const std::array<std::size_t, 8> meta = {
+        1u,    // bool
+        4u,    // int
+        8u,    // pointer size
+        16u,   // double
+        32u,   // compound types #1
+        64u,   // compound types #2
+        256u,  // compound types #3
+        2048u, // reasonable buffers
+    };
 
     [[nodiscard]] static inline int
     convertSizeToBinIndex(std::size_t const size) noexcept {
-      for (std::size_t i = 0; i < getMeta().size(); ++i) {
-        if (getMeta()[i] >= size) {
+      for (std::size_t i = 0; i < meta.size(); ++i) {
+        if (meta[i] >= size) {
           return i;
         }
       }
-      return getMeta().size();
+      return meta.size();
+    }
+
+    [[nodiscard]] inline int
+    convertPtrToBinIndex(void const *const p) noexcept {
+      for (std::size_t i = 0; i < sizedBins.size(); ++i) {
+        if (p >= sizedBins[i].mapping_begin() &&
+            p < sizedBins[i].mapping_end()) {
+          return i;
+        }
+      }
+      assert(p >= largeObjectBin.mapping_begin() &&
+             p < largeObjectBin.mapping_end());
+      return meta.size();
     }
 
   public:
@@ -71,9 +80,7 @@ public:
 
   private:
     Mapping mapping;
-    std::array<suballocators::SlotAllocator::Control,
-               std::tuple_size<std::decay_t<decltype(getMeta())>>::value>
-        sizedBins;
+    std::array<suballocators::SlotAllocator::Control, meta.size()> sizedBins;
     suballocators::LargeObjectAllocator::Control largeObjectBin;
 
   public:
@@ -93,9 +100,7 @@ public:
 private:
   klee::ref<Control> control;
 
-  std::array<suballocators::SlotAllocator,
-             std::tuple_size<std::decay_t<decltype(Control::getMeta())>>::value>
-      sizedBins;
+  std::array<suballocators::SlotAllocator, Control::meta.size()> sizedBins;
   suballocators::LargeObjectAllocator largeObjectBin;
 
 public:
@@ -113,7 +118,15 @@ public:
 
   explicit operator bool() const noexcept { return !control.isNull(); }
 
-  auto const &getSizedBinInfo() const noexcept { return Control::getMeta(); }
+  Mapping &getMapping() noexcept {
+    assert(!!*this && "Cannot get mapping of uninitialized factory.");
+    return control->mapping;
+  }
+
+  Mapping const &getMapping() const noexcept {
+    assert(!!*this && "Cannot get mapping of uninitialized factory.");
+    return control->mapping;
+  }
 
   [[nodiscard]] void *allocate(std::size_t size) {
     assert(*this && "Invalid allocator");
@@ -131,6 +144,20 @@ public:
     return result;
   }
 
+  void free(void *ptr) {
+    assert(*this && "Invalid allocator");
+    assert(ptr && "Freeing nullptrs is not supported"); // we are not ::free!
+
+    auto bin = control->convertPtrToBinIndex(ptr);
+    traceLine("Freeing ", ptr, " in bin ", bin);
+
+    if (bin < static_cast<int>(sizedBins.size())) {
+      return sizedBins[bin].deallocate(control->sizedBins[bin], ptr);
+    } else {
+      return largeObjectBin.deallocate(control->largeObjectBin, ptr);
+    }
+  }
+
   void free(void *ptr, std::size_t size) {
     assert(*this && "Invalid allocator");
     assert(ptr && "Freeing nullptrs is not supported"); // we are not ::free!
@@ -145,6 +172,19 @@ public:
     }
   }
 
+  std::size_t get_size(void const *const ptr) const noexcept {
+    assert(!!ptr);
+
+    auto bin = control->convertPtrToBinIndex(ptr);
+    traceLine("Getting size for ", ptr, " in bin ", bin);
+
+    if (bin < static_cast<int>(sizedBins.size())) {
+      return Control::meta[bin];
+    } else {
+      return largeObjectBin.getSize(control->largeObjectBin, ptr);
+    }
+  }
+
   LocationInfo location_info(void const *const ptr,
                              std::size_t const size) const noexcept {
     assert(*this && "Invalid allocator");
@@ -155,7 +195,7 @@ public:
 
     // the following is technically UB if `ptr` does not actually point inside
     // the mapping at all
-    for (std::size_t i = 0; i < Allocator::Control::getMeta().size(); ++i) {
+    for (std::size_t i = 0; i < Allocator::Control::meta.size(); ++i) {
       if (control->sizedBins[i].mapping_begin() <= ptr &&
           ptr < control->sizedBins[i].mapping_end()) {
         if (reinterpret_cast<char const *>(ptr) + size <=
@@ -184,6 +224,29 @@ public:
   }
 };
 
+struct Malloc {
+  [[nodiscard]] void *malloc(std::size_t size) noexcept {
+    return std::malloc(size);
+  }
+
+  [[nodiscard]] void *realloc(void *p, std::size_t size) noexcept {
+    return std::realloc(p, size);
+  }
+
+  void free(void *p) noexcept { return std::free(p); }
+
+  template <typename T, typename... V> [[nodiscard]] T *create(V &&...args) {
+    auto *p = malloc(sizeof(T));
+    new (p) T(std::forward<V>(args)...);
+    return static_cast<T>(p);
+  }
+
+  template <typename T> void destroy(T *p) {
+    p.~T();
+    free(p);
+  }
+};
+
 class AllocatorFactory {
 public:
   static constexpr const auto unlimitedQuarantine =
@@ -203,35 +266,36 @@ public:
       : AllocatorFactory(Mapping{address, size}, quarantineSize) {}
 
   AllocatorFactory(Mapping &&mapping, std::uint32_t const quarantineSize) {
-    assert(mapping && "Invalid mapping");
-    assert(mapping.getSize() >
-               Allocator::Control::getMeta().size() * 4096 + 3 * 4096 &&
-           "Mapping is *far* to small");
+    if (mapping) {
+      assert(mapping.getSize() >
+                 Allocator::Control::meta.size() * 4096 + 3 * 4096 &&
+             "Mapping is *far* to small");
 
-    control = new Allocator::Control(std::move(mapping));
-    auto const binSize =
-        static_cast<std::size_t>(1)
-        << (std::numeric_limits<std::size_t>::digits - 1 -
-            countLeadingZeroes(control->mapping.getSize() /
-                               (Allocator::Control::getMeta().size() + 1)));
-    char *const base = static_cast<char *>(control->mapping.getBaseAddress());
-    std::size_t totalSize = 0;
-    for (std::size_t i = 0; i < Allocator::Control::getMeta().size(); ++i) {
-      control->sizedBins[i].initialize(
-          base + totalSize, binSize, Allocator::Control::getMeta()[i],
+      control = new Allocator::Control(std::move(mapping));
+      auto const binSize =
+          static_cast<std::size_t>(1)
+          << (std::numeric_limits<std::size_t>::digits - 1 -
+              countLeadingZeroes(control->mapping.getSize() /
+                                 (Allocator::Control::meta.size() + 1)));
+      char *const base = static_cast<char *>(control->mapping.getBaseAddress());
+      std::size_t totalSize = 0;
+      for (std::size_t i = 0; i < Allocator::Control::meta.size(); ++i) {
+        control->sizedBins[i].initialize(
+            base + totalSize, binSize, Allocator::Control::meta[i],
+            quarantineSize == unlimitedQuarantine,
+            quarantineSize == unlimitedQuarantine ? 0 : quarantineSize);
+
+        totalSize += binSize;
+        assert(totalSize <= control->mapping.getSize() && "Mapping too small");
+      }
+
+      auto largeObjectBinSize = control->mapping.getSize() - totalSize;
+      assert(largeObjectBinSize > 0);
+      control->largeObjectBin.initialize(
+          base + totalSize, largeObjectBinSize,
           quarantineSize == unlimitedQuarantine,
           quarantineSize == unlimitedQuarantine ? 0 : quarantineSize);
-
-      totalSize += binSize;
-      assert(totalSize <= control->mapping.getSize() && "Mapping too small");
     }
-
-    auto largeObjectBinSize = control->mapping.getSize() - totalSize;
-    assert(largeObjectBinSize > 0);
-    control->largeObjectBin.initialize(
-        base + totalSize, largeObjectBinSize,
-        quarantineSize == unlimitedQuarantine,
-        quarantineSize == unlimitedQuarantine ? 0 : quarantineSize);
   }
 
   explicit operator bool() const noexcept { return !control.isNull(); }
