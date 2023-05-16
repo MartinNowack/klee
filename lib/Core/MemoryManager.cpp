@@ -193,6 +193,8 @@ MemoryManager::MemoryManager(ArrayCache *_arrayCache)
                    DeterministicAllocationQuarantineSize.getValue());
     }
 
+    // TODO: Would be worth to transform the tuple into a struct for improved
+    // readability.
     std::vector<std::tuple<std::string,
                            std::uintptr_t, // start address (0 if none
                                            // requested)
