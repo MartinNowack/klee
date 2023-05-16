@@ -11,7 +11,6 @@
 #include "cli.h"
 
 #include "klee/ADT/KTest.h"
-#include "klee/Solver/SolverCmdLine.h"
 
 #include <string>
 
