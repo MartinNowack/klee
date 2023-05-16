@@ -9,18 +9,19 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "klee/ADT/KTest.h"
 #include "klee/ADT/TreeStream.h"
 #include "klee/Config/Version.h"
 #include "klee/Core/Interpreter.h"
 #include "klee/Expr/Expr.h"
-#include "klee/ADT/KTest.h"
-#include "klee/Support/OptionCategories.h"
-#include "klee/Statistics/Statistics.h"
 #include "klee/Solver/SolverCmdLine.h"
+#include "klee/Statistics/Statistics.h"
 #include "klee/Support/Debug.h"
 #include "klee/Support/ErrorHandling.h"
 #include "klee/Support/FileHandling.h"
+#include "klee/Support/KConfig.h"
 #include "klee/Support/ModuleUtil.h"
+#include "klee/Support/OptionCategories.h"
 #include "klee/Support/PrintVersion.h"
 #include "klee/System/Time.h"
 
@@ -1602,6 +1603,9 @@ int main(int argc, char **argv, char **envp) {
     llvm::errs().resetColor();
 
   handler->getInfoStream() << stats.str();
+
+  auto config_file = handler->openOutputFile("klee.kconfig");
+  KConfig::get().manifest(std::move(config_file));
 
   delete handler;
 
