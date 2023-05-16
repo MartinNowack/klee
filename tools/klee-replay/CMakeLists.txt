@@ -17,6 +17,8 @@ if (HAVE_PTY_H OR HAVE_UTIL_H OR HAVE_LIBUTIL_H)
 
   target_link_libraries(klee-replay PRIVATE kleeBasic)
   target_include_directories(klee-replay PRIVATE ${KLEE_INCLUDE_DIRS} ${LLVM_INCLUDE_DIRS})
+  target_compile_options(klee-replay PRIVATE ${KLEE_COMPONENT_CXX_FLAGS})
+  target_compile_definitions(klee-replay PRIVATE ${KLEE_COMPONENT_CXX_DEFINES})
 
   if(LIBCAP_LIBRARIES)
     target_link_libraries(klee-replay PRIVATE ${LIBCAP_LIBRARIES})
